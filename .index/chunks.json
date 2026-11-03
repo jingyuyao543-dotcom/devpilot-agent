@@ -1,0 +1,170 @@
+[
+  {
+    "chunk_id": "75d699f6e8f8",
+    "doc": "中间件配置说明",
+    "header_path": "中间件配置说明 > 1. 服务基础配置 > 1.1 应用端口与线程",
+    "text": "`server.port` 默认 8080，生产统一 8801~8810 区间。\n`server.tomcat.threads.max` 设为 200，配合连接池最大 20 时注意比值，\n线程数远大于连接池会导致大量线程排队等待连接，表现为接口 P99 抖动。",
+    "allowed_groups": []
+  },
+  {
+    "chunk_id": "9ecc53d9612b",
+    "doc": "中间件配置说明",
+    "header_path": "中间件配置说明 > 1. 服务基础配置 > 1.2 超时矩阵",
+    "text": "跨服务调用必须同时设置三层超时，且外层大于内层：\n\n| 层 | 配置 | 建议值 |\n| --- | --- | --- |\n| 客户端（RestTemplate/WebClient） | connect / read | 2s / 10s |\n| 网关（Nginx） | proxy_read_timeout | 120s |\n| 服务端（LLM 推理） | 整任务超时 | 90s |\n\n服务端整任务超时必须小于网关，否则网关先断开，客户端拿不到错误信息。",
+    "allowed_groups": []
+  },
+  {
+    "chunk_id": "450d5cd7d68c",
+    "doc": "中间件配置说明",
+    "header_path": "中间件配置说明 > 2. HikariCP 连接池",
+    "text": "```yaml\nspring:\n  datasource:\n    hikari:\n      maximum-pool-size: 20\n      minimum-idle: 5\n      connection-timeout: 3000\n      idle-timeout: 600000\n      max-lifetime: 1800000\n      leak-detection-threshold: 60000\n```\n\n`max-lifetime` 必须小于数据库侧 `wait_timeout`（MySQL 默认 28800s，云厂商常配 600s），\n否则拿到已被服务端断开的连接，报 `Communications link failure`。\n\n`connection-timeout` 建议 3s 而非默认 30s：快速失败比长时间排队更容易定位问题。",
+    "allowed_groups": []
+  },
+  {
+    "chunk_id": "19ac769e682f",
+    "doc": "中间件配置说明",
+    "header_path": "中间件配置说明 > 3. Redis > 3.1 关键配置",
+    "text": "- `maxmemory-policy allkeys-lru`：缓存场景用 LRU，但会话和令牌类数据不要和缓存混用同一实例。\n- 禁止使用 `KEYS *`，用 `SCAN` 分批遍历。\n- 大 key 阈值：String > 10KB、集合元素 > 5000 即视为大 key，会阻塞主线程。",
+    "allowed_groups": []
+  },
+  {
+    "chunk_id": "7eff58cd83e4",
+    "doc": "中间件配置说明",
+    "header_path": "中间件配置说明 > 3. Redis > 3.2 会话记忆存储",
+    "text": "Agent 多轮会话存储结构推荐：\n\n- `chat:context:{sessionId}` —— List 类型，`LPUSH` 新消息，`LTRIM 0 9` 保留最近 5 轮（10 条），\n  每次写入后 `EXPIRE 1800` 续期。\n- `chat:summary:{sessionId}` —— String，滚动摘要，第 6 轮起把最老一轮并入。\n- `chat:constraint:{sessionId}` —— Hash，存用户显式约束（如\"只看 payment 模块\"），\n  **独立于对话历史**，避免滑动窗口把早期约束挤掉。",
+    "allowed_groups": []
+  },
+  {
+    "chunk_id": "d758749fd1b7",
+    "doc": "中间件配置说明",
+    "header_path": "中间件配置说明 > 4. RabbitMQ > 4.1 队列声明",
+    "text": "```java\n@Bean\npublic Queue docParseQueue() {\n    return QueueBuilder.durable(\"agent.doc.parse\")\n        .withArgument(\"x-dead-letter-exchange\", \"agent.dlx\")\n        .withArgument(\"x-dead-letter-routing-key\", \"doc.parse.dlq\")\n        .build();\n}\n```",
+    "allowed_groups": []
+  },
+  {
+    "chunk_id": "298b907c874e",
+    "doc": "中间件配置说明",
+    "header_path": "中间件配置说明 > 4. RabbitMQ > 4.2 需要确认的三件事",
+    "text": "1. `publisher confirms` + 手动 ACK，否则消息丢失无感知。\n2. 消费者 prefetch 设为 1~5，避免一个消费者堆积大量未处理消息导致重试时放大。\n3. 消息体不要塞大文件，只传 `doc_id` + 存储路径，避免消息队列被大 payload 拖慢。",
+    "allowed_groups": []
+  },
+  {
+    "chunk_id": "129c252591f3",
+    "doc": "中间件配置说明",
+    "header_path": "中间件配置说明 > 5. 常见错误码对照",
+    "text": "| 错误信息 | 含义 | 处理 |\n| --- | --- | --- |\n| `Connection is not available` | 连接池耗尽 | 查长事务与泄漏 |\n| `Communications link failure` | 连接被服务端断开 | `max-lifetime` 调小 |\n| `RedisCommandTimeoutException` | Redis 响应慢 | 查大 key / 慢查询 |\n| `PRECONDITION_FAILED - unknown delivery tag` | 重复 ACK | 检查异常分支 |\n| `413 Request Entity Too Large` | 上传超限 | 调 `client_max_body_size` |\n| `504 Gateway Time-out` | 网关超时 | 检查服务端整任务超时 |\n| `CORS preflight did not succeed` | 预检被拦 | 鉴权需放行 OPTIONS |",
+    "allowed_groups": []
+  },
+  {
+    "chunk_id": "195fd4ad638e",
+    "doc": "故障排查手册",
+    "header_path": "常见故障排查手册 > 1. NullPointerException 排查 > 1.1 典型成因",
+    "text": "Jackson 反序列化场景下的 NPE 有三类高频原因，按出现频率排序：\n\n1. **字段缺失后未判空**：上游返回的 JSON 中缺少某个字段，`@JsonProperty` 未标 `required`，\n   反序列化为 null 后直接参与运算。日志特征为 NPE 出现在 DTO 的 getter 调用之后。\n2. **`@JsonSubTypes` 类型解析失败**：多态反序列化时 type 字段值不在已注册子类型中，\n   Jackson 不会报错而是返回 null，调用方 NPE。特征是堆栈里出现 `TypeDeserializer`。\n3. **静态初始化顺序**：`ObjectMapper` 被声明为 static 且在静态块中被提前使用。",
+    "allowed_groups": []
+  },
+  {
+    "chunk_id": "19ac8d76e2e7",
+    "doc": "故障排查手册",
+    "header_path": "常见故障排查手册 > 1. NullPointerException 排查 > 1.2 定位步骤",
+    "text": "- 从堆栈第一帧找到业务方法，确认 NPE 发生在 `getXxx()` 返回后还是集合遍历时。\n- 若是集合遍历时 NPE，检查反序列化是否使用了 `FAIL_ON_NULL_FOR_PRIMITIVES`。\n- 用 `curl` 重放原始请求体，对比线上与预发响应字段差异。",
+    "allowed_groups": []
+  },
+  {
+    "chunk_id": "e62d71fc0f58",
+    "doc": "故障排查手册",
+    "header_path": "常见故障排查手册 > 1. NullPointerException 排查 > 1.3 修复建议",
+    "text": "在 DTO 上统一开启 `DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES`，\n并在入口处增加字段校验（`@Valid` + `@NotNull`），把 NPE 提前暴露为 400 而非 500。",
+    "allowed_groups": []
+  },
+  {
+    "chunk_id": "3ce3b7dc9945",
+    "doc": "故障排查手册",
+    "header_path": "常见故障排查手册 > 2. 数据库连接池耗尽 > 2.1 现象",
+    "text": "日志出现 `HikariPool-1 - Connection is not available, request timed out after 30000ms`，\n接口大面积超时，CPU 不高但线程数持续增长。",
+    "allowed_groups": []
+  },
+  {
+    "chunk_id": "638ebe60d964",
+    "doc": "故障排查手册",
+    "header_path": "常见故障排查手册 > 2. 数据库连接池耗尽 > 2.2 常见根因",
+    "text": "- **长事务**：事务内调用了外部 HTTP 接口或 RPC，导致连接被占用数十秒。\n- **连接泄漏**：手动 `getConnection()` 但异常分支未 close。\n- **池大小配置不合理**：`maximumPoolSize` 小于并发需求，或远大于数据库 `max_connections`。",
+    "allowed_groups": []
+  },
+  {
+    "chunk_id": "7b99964d5a55",
+    "doc": "故障排查手册",
+    "header_path": "常见故障排查手册 > 2. 数据库连接池耗尽 > 2.3 排查与修复",
+    "text": "1. 打开 `leakDetectionThreshold`（建议 60000ms）拿到泄漏堆栈。\n2. 检查 `activeConnections` 与 `idleConnections` 曲线，判断是突发流量还是持续占用。\n3. 事务内禁止调用外部服务，改为事务外异步。\n4. 池大小经验值：CPU 核数 × 2 + 磁盘数，且所有实例之和不超过 DB 最大连接数的 70%。",
+    "allowed_groups": []
+  },
+  {
+    "chunk_id": "3aa21b334068",
+    "doc": "故障排查手册",
+    "header_path": "常见故障排查手册 > 3. Redis 限流实现 > 3.1 滑动窗口 + Lua",
+    "text": "两个方案的区别：固定窗口在窗口边界会出现双倍流量（前一秒末尾和后一秒开头都放行），\n滑动窗口用 ZSET 记录每次请求时间戳，按时间范围 `ZCOUNT` 统计，边界平滑。\n\nLua 脚本在 Redis 中原子执行，避免 `ZCOUNT` 与 `ZADD` 之间的竞态：\n\n```lua\nlocal key = KEYS[1]\nlocal now = tonumber(ARGV[1])\nlocal window = tonumber(ARGV[2])\nlocal limit = tonumber(ARGV[3])\nredis.call('ZREMRANGEBYSCORE', key, 0, now - window)\nlocal count = redis.call('ZCARD', key)\nif count >= limit then\n  return 0\nend\nredis.call('ZADD', key, now, ARGV[4])\nredis.call('PEXPIRE', key, window)\nreturn 1\n```",
+    "allowed_groups": []
+  },
+  {
+    "chunk_id": "973414cb4a41",
+    "doc": "故障排查手册",
+    "header_path": "常见故障排查手册 > 3. Redis 限流实现 > 3.2 Token 额度限流",
+    "text": "按请求次数限流无法控制成本，Agent 场景应按 token 计费：\n从模型响应的 `usage` 字段累加 `prompt_tokens + completion_tokens` 到\n`token:quota:{userId}:{date}`，用 `INCRBY` 累加并设置 24 小时过期，\n超限时返回 429 并附剩余额度。注意流式响应需要在 `stream_options` 中显式开启 `include_usage`，\n否则 usage 永远为空。",
+    "allowed_groups": []
+  },
+  {
+    "chunk_id": "17247b6fe483",
+    "doc": "故障排查手册",
+    "header_path": "常见故障排查手册 > 4. RabbitMQ 消息可靠消费 > 4.1 重复消费与幂等",
+    "text": "MQ 承诺的是至少一次投递，重复消费是必然的。幂等做法：\n\n- 消息体携带业务唯一键（如 `doc_id + content_hash`），消费前查唯一索引，存在则直接 ACK。\n- 或在 Redis 用 `SETNX msg_id` 做去重窗口（TTL 24h）。\n- 向量写入必须用 upsert 语义，不能用 add，否则重复消费会产生重复 chunk。",
+    "allowed_groups": []
+  },
+  {
+    "chunk_id": "faa03b84baf4",
+    "doc": "故障排查手册",
+    "header_path": "常见故障排查手册 > 4. RabbitMQ 消息可靠消费 > 4.2 失败重试与死信",
+    "text": "- `x-death` 计数重试 3 次后进入死信队列，DCQ 需人工确认或定时补偿任务捞回。\n- 消费者要处理「状态卡在 PROCESSING」：加超时扫描任务，把超过 30 分钟未完成的任务重置为待处理。\n- 大文档入库应分片：按页/章节拆成 N 个子任务并行消费，全部完成后聚合状态；\n  任一失败标记 PARTIAL，避免一个坏页面阻塞整体。",
+    "allowed_groups": []
+  },
+  {
+    "chunk_id": "dc785e7f9562",
+    "doc": "故障排查手册",
+    "header_path": "常见故障排查手册 > 5. SSE 流式响应中断 > 5.1 常见原因",
+    "text": "- **Nginx buffering**：默认 `proxy_buffering on` 会把流式响应积攒成整块返回，\n  前端表现为长时间无输出后突然吐出全部内容。需在响应头加 `X-Accel-Buffering: no`。\n- **两级超时不匹配**：Java `SseEmitter` 的 timeout 必须大于 Python 侧整任务超时，\n  否则后端还在推理、连接已被关闭，前端拿到半截内容。\n- **空闲连接被杀**：长时间无数据时网关会断开，需要每 15 秒发送心跳事件（`event: ping`）。\n- **客户端断开未取消下游**：用户关闭页面后模型仍在生成，浪费 token。\n  需监听 IOException / 连接关闭事件，主动 cancel 上游调用。",
+    "allowed_groups": []
+  },
+  {
+    "chunk_id": "f30e24c6a75d",
+    "doc": "故障排查手册",
+    "header_path": "常见故障排查手册 > 6. JVM 内存溢出（OOM）排查 > 6.1 判断类型",
+    "text": "- `java.lang.OutOfMemoryError: Java heap space` —— 堆内对象过多，需分析对象引用链。\n- `unable to create new native thread` —— 线程数过多，查线程泄漏。\n- `Metaspace` —— 动态生成类过多（CGLIB 代理、反射），检查类加载器泄漏。",
+    "allowed_groups": []
+  },
+  {
+    "chunk_id": "e711f2b311ac",
+    "doc": "故障排查手册",
+    "header_path": "常见故障排查手册 > 6. JVM 内存溢出（OOM）排查 > 6.2 步骤",
+    "text": "1. 启动参数加 `-XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/data/dump`。\n2. `MAT` 或 `jvisualvm` 打开 dump，看 dominator tree 找占比最大的对象。\n3. 若是集合膨胀，检查是否有缓存未设上限（建议 Caffeine + maximumSize）。\n4. 对比两次 dump 的 histo 结果，确认对象是否持续增长。",
+    "allowed_groups": []
+  },
+  {
+    "chunk_id": "8a8bc5f2bbcb",
+    "doc": "故障排查手册",
+    "header_path": "常见故障排查手册 > 7. 向量索引与 Embedding 升级 > 7.1 换模型必须全量重建",
+    "text": "不同 embedding 模型的向量空间不可比，混用会导致检索质量断崖式下降且难以察觉。\n升级流程：\n\n1. 新建索引 `kb_v2`，全量重新向量化（评估耗时，几百页文档通常需要 20 分钟以上）。\n2. 用评测集在 v1 / v2 上各跑一遍 recall@k，确认 v2 不劣于 v1。\n3. 通过别名切换（`kb_current -> kb_v2`），保留 v1 一周便于回滚。\n4. chunk 上存 `content_hash`，用于增量更新与去重。",
+    "allowed_groups": []
+  },
+  {
+    "chunk_id": "74e0be2668a2",
+    "doc": "故障排查手册",
+    "header_path": "常见故障排查手册 > 8. 混合检索与 RRF 融合 > 8.1 为什么不加权求和",
+    "text": "BM25 分数的值域与余弦相似度完全不可比（前者受文档长度和词频影响，典型 0~30，\n后者 -1~1），归一化后仍会随语料变化而漂移，权重需要反复调参且不稳定。\n\nRRF（Reciprocal Rank Fusion）只用排名不用分数：\n\n```\nscore(d) = Σ 1 / (k + rank_i(d))     k 通常取 60\n```\n\n好处是对两路分数分布完全不敏感，且天然抑制单路异常高分的支配。\n代价是丢失了分数间距信息（第 1 名和第 2 名差距多大不影响融合结果）。",
+    "allowed_groups": []
+  },
+  {
+    "chunk_id": "2c71be076630",
+    "doc": "故障排查手册",
+    "header_path": "常见故障排查手册 > 8. 混合检索与 RRF 融合 > 8.2 重排（Rerank）",
+    "text": "召回 top 50 后交给 cross-encoder 精排（如 BGE-reranker）取 top 5。\n收益是精度提升，代价是延迟增加，base 版本在 CPU 上对 50 条候选约需 100~300ms，\n可用 batch 推理与候选数裁剪（50 → 30）来压延迟。",
+    "allowed_groups": []
+  }
+]

@@ -1,0 +1,33 @@
+# ---- 密钥：绝对不能提交 ----
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+
+# ---- 虚拟环境 ----
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# ---- 运行产物 ----
+logs/
+traces/
+regression_log.jsonl
+chroma_db/
+*.log
+
+# ---- pip 残留（之前踩坑留下的）----
+pip-*
+pip-build-tracker-*
+pip-ephem-wheel-cache-*
+pip-install-*
+
+# ---- 编辑器 / 系统 ----
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
