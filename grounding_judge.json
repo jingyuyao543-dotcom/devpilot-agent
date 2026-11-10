@@ -1,0 +1,889 @@
+{
+  "n": 25,
+  "rows": [
+    {
+      "qid": "L1",
+      "kind": "lexical",
+      "query": "HikariCP 连接池耗尽 Connection is not available 怎么排查",
+      "steps": 2,
+      "degraded": false,
+      "degrade_reason": "",
+      "latency_ms": 6902,
+      "answer_chars": 1259,
+      "answer_head": "**现象** 日志出现 `HikariPool-1 - Connection is not available, request timed out after 30000ms`，接口大面积超时，CPU 不高但线程数持续增长。  **根因** 连接池耗尽，即所有连接都被占用，新请求在 `connectionTimeou",
+      "citations": [
+        "3ce3b7dc9945",
+        "129c252591f3",
+        "638ebe60d964",
+        "7b99964d5a55",
+        "450d5cd7d68c",
+        "75d699f6e8f8"
+      ],
+      "chunk_citations": [
+        "3ce3b7dc9945",
+        "129c252591f3",
+        "638ebe60d964",
+        "7b99964d5a55",
+        "450d5cd7d68c",
+        "75d699f6e8f8"
+      ],
+      "commit_citations": [],
+      "fake_citations": [],
+      "unverifiable_commits": [],
+      "level": "L2_引用可溯源",
+      "is_hallucination": false,
+      "said_insufficient": false,
+      "judge": {
+        "label": "SUPPORTED",
+        "level": "A_支撑",
+        "is_misattribution": false,
+        "reason": "文档明确记载该日志现象及连接池耗尽根因",
+        "raw_head": "{\"label\": \"SUPPORTED\", \"reason\": \"文档明确记载该日志现象及连接池耗尽根因\"}"
+      }
+    },
+    {
+      "qid": "L2",
+      "kind": "lexical",
+      "query": "Redis 限流 滑动窗口 Lua 脚本怎么实现",
+      "steps": 2,
+      "degraded": false,
+      "degrade_reason": "",
+      "latency_ms": 7233,
+      "answer_chars": 1373,
+      "answer_head": "**现象**  咨询类问题：如何在 Redis 中用滑动窗口 + Lua 脚本实现限流。内部手册中有对应实现方案。  **根因**  （本问题不涉及故障，无根因可分析。以下为方案说明。）  固定窗口限流在窗口边界会出现双倍流量：前一秒末尾和后一秒开头都放行。滑动窗口用 ZSET 记录每次请求的时间戳，按时间范围统计，边",
+      "citations": [
+        "3aa21b334068",
+        "973414cb4a41",
+        "19ac769e682f"
+      ],
+      "chunk_citations": [
+        "3aa21b334068",
+        "973414cb4a41",
+        "19ac769e682f"
+      ],
+      "commit_citations": [],
+      "fake_citations": [],
+      "unverifiable_commits": [],
+      "level": "L2_引用可溯源",
+      "is_hallucination": false,
+      "said_insufficient": false,
+      "judge": {
+        "label": "SUPPORTED",
+        "level": "A_支撑",
+        "is_misattribution": false,
+        "reason": "文档明确给出滑动窗口ZSET+Lua脚本实现",
+        "raw_head": "{\"label\": \"SUPPORTED\", \"reason\": \"文档明确给出滑动窗口ZSET+Lua脚本实现\"}"
+      }
+    },
+    {
+      "qid": "L3",
+      "kind": "lexical",
+      "query": "RabbitMQ 消息重复消费 幂等 怎么保证",
+      "steps": 2,
+      "degraded": false,
+      "degrade_reason": "",
+      "latency_ms": 6775,
+      "answer_chars": 1184,
+      "answer_head": "**现象**  RabbitMQ 采用“至少一次”投递语义，因此重复消费是必然事件，并非异常。需要关注的是重复消费会不会产生副作用，例如重复写入向量 chunk、重复扣减额度、重复更新业务状态。  **根因**  重复消费的触发来源有三类： 1. 消费者处理完成后、ACK 之前进程崩溃或网络断开，broker 重新投递",
+      "citations": [
+        "17247b6fe483",
+        "298b907c874e",
+        "faa03b84baf4"
+      ],
+      "chunk_citations": [
+        "17247b6fe483",
+        "298b907c874e",
+        "faa03b84baf4"
+      ],
+      "commit_citations": [],
+      "fake_citations": [],
+      "unverifiable_commits": [],
+      "level": "L2_引用可溯源",
+      "is_hallucination": false,
+      "said_insufficient": true,
+      "judge": {
+        "label": "PARTIAL",
+        "level": "B_部分支撑",
+        "is_misattribution": false,
+        "reason": "文档支持至少一次投递和重复消费，但根因三类未完整覆盖",
+        "raw_head": "{\"label\": \"PARTIAL\", \"reason\": \"文档支持至少一次投递和重复消费，但根因三类未完整覆盖\"}"
+      }
+    },
+    {
+      "qid": "L4",
+      "kind": "lexical",
+      "query": "JVM OOM heap dump 用什么工具分析",
+      "steps": 2,
+      "degraded": false,
+      "degrade_reason": "",
+      "latency_ms": 6693,
+      "answer_chars": 1088,
+      "answer_head": "**现象** 询问 JVM OOM 产生的 heap dump 应使用什么工具分析。这是工具选型咨询，不涉及具体故障实例。  **根因** 不适用（非故障）。内部手册对 OOM 排查已有明确流程，工具选型可直接引用。  **证据** - `[doc=故障排查手册 id=e711f2b311ac]` 6.2 步骤：第 1",
+      "citations": [
+        "e711f2b311ac",
+        "f30e24c6a75d"
+      ],
+      "chunk_citations": [
+        "e711f2b311ac",
+        "f30e24c6a75d"
+      ],
+      "commit_citations": [],
+      "fake_citations": [],
+      "unverifiable_commits": [],
+      "level": "L2_引用可溯源",
+      "is_hallucination": false,
+      "said_insufficient": true,
+      "judge": {
+        "label": "SUPPORTED",
+        "level": "A_支撑",
+        "is_misattribution": false,
+        "reason": "文档明确写MAT或jvisualvm打开dump分析",
+        "raw_head": "{\"label\": \"SUPPORTED\", \"reason\": \"文档明确写MAT或jvisualvm打开dump分析\"}"
+      }
+    },
+    {
+      "qid": "L5",
+      "kind": "lexical",
+      "query": "换 embedding 模型之后向量索引要全量重建吗",
+      "steps": 2,
+      "degraded": false,
+      "degrade_reason": "",
+      "latency_ms": 5897,
+      "answer_chars": 770,
+      "answer_head": "**现象**  更换 embedding 模型后，是否需要全量重建向量索引。  **根因**  需要全量重建。不同 embedding 模型产出的向量位于不同的向量空间，彼此不可比；新旧向量混在同一索引里，会导致检索质量断崖式下降，而且这种下降很难被察觉（不会报错，只会表现为召回变差）。  **证据**  - `[do",
+      "citations": [
+        "8a8bc5f2bbcb",
+        "17247b6fe483"
+      ],
+      "chunk_citations": [
+        "8a8bc5f2bbcb",
+        "17247b6fe483"
+      ],
+      "commit_citations": [],
+      "fake_citations": [],
+      "unverifiable_commits": [],
+      "level": "L2_引用可溯源",
+      "is_hallucination": false,
+      "said_insufficient": true,
+      "judge": {
+        "label": "SUPPORTED",
+        "level": "A_支撑",
+        "is_misattribution": false,
+        "reason": "文档明确写换模型必须全量重建且向量空间不可比",
+        "raw_head": "{\"label\": \"SUPPORTED\", \"reason\": \"文档明确写换模型必须全量重建且向量空间不可比\"}"
+      }
+    },
+    {
+      "qid": "L6",
+      "kind": "lexical",
+      "query": "RabbitMQ 死信队列 x-death 重试几次进死信",
+      "steps": 2,
+      "degraded": false,
+      "degrade_reason": "",
+      "latency_ms": 7437,
+      "answer_chars": 1017,
+      "answer_head": "**现象** 询问本系统 RabbitMQ 死信队列中 `x-death` 计数达到多少次后消息进入死信队列（DLQ）。  **根因** 这是配置约定问题，不是故障。本系统约定：消息被拒绝或消费失败后，`x-death` 计数累计到 3 次，就进入死信队列；进入死信队列后，需要人工确认，或由定时补偿任务捞回。  **证",
+      "citations": [
+        "faa03b84baf4",
+        "d758749fd1b7",
+        "298b907c874e",
+        "17247b6fe483"
+      ],
+      "chunk_citations": [
+        "faa03b84baf4",
+        "d758749fd1b7",
+        "298b907c874e",
+        "17247b6fe483"
+      ],
+      "commit_citations": [],
+      "fake_citations": [],
+      "unverifiable_commits": [],
+      "level": "L2_引用可溯源",
+      "is_hallucination": false,
+      "said_insufficient": false,
+      "judge": {
+        "label": "SUPPORTED",
+        "level": "A_支撑",
+        "is_misattribution": false,
+        "reason": "文档明确写x-death重试3次后进入死信队列",
+        "raw_head": "{\"label\": \"SUPPORTED\", \"reason\": \"文档明确写x-death重试3次后进入死信队列\"}"
+      }
+    },
+    {
+      "qid": "L7",
+      "kind": "lexical",
+      "query": "HikariCP max-lifetime 和 wait_timeout 的关系",
+      "steps": 2,
+      "degraded": false,
+      "degrade_reason": "",
+      "latency_ms": 8414,
+      "answer_chars": 1662,
+      "answer_head": "**现象**  这是配置关系咨询，不是线上故障。核心结论：`max-lifetime` 必须**小于**数据库侧 `wait_timeout`，否则连接池会拿到已被 MySQL 服务端单方面关闭的连接，报 `Communications link failure`。  **根因**  - `wait_timeout` ",
+      "citations": [
+        "450d5cd7d68c",
+        "129c252591f3",
+        "638ebe60d964",
+        "7b99964d5a55"
+      ],
+      "chunk_citations": [
+        "450d5cd7d68c",
+        "129c252591f3",
+        "638ebe60d964",
+        "7b99964d5a55"
+      ],
+      "commit_citations": [],
+      "fake_citations": [],
+      "unverifiable_commits": [],
+      "level": "L2_引用可溯源",
+      "is_hallucination": false,
+      "said_insufficient": false,
+      "judge": {
+        "label": "SUPPORTED",
+        "level": "A_支撑",
+        "is_misattribution": false,
+        "reason": "文档[2]明确写出max-lifetime须小于wait_timeout及后果",
+        "raw_head": "{\"label\": \"SUPPORTED\", \"reason\": \"文档[2]明确写出max-lifetime须小于wait_timeout及后果\"}"
+      }
+    },
+    {
+      "qid": "L8",
+      "kind": "lexical",
+      "query": "RabbitMQ 队列声明 durable 配死信 exchange 的写法",
+      "steps": 2,
+      "degraded": false,
+      "degrade_reason": "",
+      "latency_ms": 5398,
+      "answer_chars": 1060,
+      "answer_head": "**现象** 咨询 RabbitMQ 队列声明中 `durable` 与死信 exchange 的配置写法。  **根因** 这是配置写法咨询，并非故障。内部文档给出了本系统约定的标准写法。  **证据** - `[doc=中间件配置说明 id=d758749fd1b7]` 队列声明示例：  ```java @Bean",
+      "citations": [
+        "d758749fd1b7",
+        "faa03b84baf4",
+        "298b907c874e"
+      ],
+      "chunk_citations": [
+        "d758749fd1b7",
+        "faa03b84baf4",
+        "298b907c874e"
+      ],
+      "commit_citations": [],
+      "fake_citations": [],
+      "unverifiable_commits": [],
+      "level": "L2_引用可溯源",
+      "is_hallucination": false,
+      "said_insufficient": true,
+      "judge": {
+        "label": "SUPPORTED",
+        "level": "A_支撑",
+        "is_misattribution": false,
+        "reason": "文档明确给出durable加死信exchange的写法",
+        "raw_head": "{\"label\": \"SUPPORTED\", \"reason\": \"文档明确给出durable加死信exchange的写法\"}"
+      }
+    },
+    {
+      "qid": "S1",
+      "kind": "semantic",
+      "query": "为什么我的限流在整点附近会突然放过两倍的请求",
+      "steps": 3,
+      "degraded": false,
+      "degrade_reason": "",
+      "latency_ms": 10598,
+      "answer_chars": 1163,
+      "answer_head": "**现象** 限流在整点（窗口边界）附近放行的请求量约为配置上限的两倍，边界过后恢复正常。  **根因** 这是**固定窗口（fixed window）计数器**的固有缺陷，不是配置错误也不是 Redis 故障：计数器按自然时间窗口（如 `rate:limit:{userId}:{yyyyMMddHH}`）分桶，窗口切",
+      "citations": [
+        "3aa21b334068",
+        "973414cb4a41",
+        "19ac769e682f"
+      ],
+      "chunk_citations": [
+        "3aa21b334068",
+        "973414cb4a41",
+        "19ac769e682f"
+      ],
+      "commit_citations": [],
+      "fake_citations": [],
+      "unverifiable_commits": [],
+      "level": "L2_引用可溯源",
+      "is_hallucination": false,
+      "said_insufficient": true,
+      "judge": {
+        "label": "SUPPORTED",
+        "level": "A_支撑",
+        "is_misattribution": false,
+        "reason": "文档明确写固定窗口边界会出现双倍流量",
+        "raw_head": "{\"label\": \"SUPPORTED\", \"reason\": \"文档明确写固定窗口边界会出现双倍流量\"}"
+      }
+    },
+    {
+      "qid": "S2",
+      "kind": "semantic",
+      "query": "接口大面积超时 CPU 却不高，线程数一直涨",
+      "steps": 3,
+      "degraded": false,
+      "degrade_reason": "",
+      "latency_ms": 12502,
+      "answer_chars": 2487,
+      "answer_head": "**现象** 接口大面积超时，CPU 占用不高，但线程数持续增长。日志中同时出现 `NullPointerException`（`skuDetail` 为 null）和 `InvalidFormatException` 反序列化失败，随后触发重试。  **根因** 主因是**数据库连接池耗尽**，并非 CPU 或 GC",
+      "citations": [
+        "3ce3b7dc9945",
+        "75d699f6e8f8",
+        "638ebe60d964",
+        "7b99964d5a55",
+        "450d5cd7d68c",
+        "129c252591f3",
+        "9ecc53d9612b"
+      ],
+      "chunk_citations": [
+        "3ce3b7dc9945",
+        "75d699f6e8f8",
+        "638ebe60d964",
+        "7b99964d5a55",
+        "450d5cd7d68c",
+        "129c252591f3",
+        "9ecc53d9612b"
+      ],
+      "commit_citations": [],
+      "fake_citations": [],
+      "unverifiable_commits": [],
+      "level": "L2_引用可溯源",
+      "is_hallucination": false,
+      "said_insufficient": false,
+      "judge": {
+        "label": "UNSUPPORTED",
+        "level": "C_不支撑",
+        "is_misattribution": true,
+        "reason": "日志无连接池耗尽证据，根因无支撑",
+        "raw_head": "{\"label\": \"UNSUPPORTED\", \"reason\": \"日志无连接池耗尽证据，根因无支撑\"}"
+      }
+    },
+    {
+      "qid": "S3",
+      "kind": "semantic",
+      "query": "对话里用户开头说的限制条件，聊到后面模型就忘了",
+      "steps": 2,
+      "degraded": false,
+      "degrade_reason": "",
+      "latency_ms": 6810,
+      "answer_chars": 1068,
+      "answer_head": "**现象** 多轮对话中，用户在开头给出的限制条件（如“只看 payment 模块”）在后续轮次被模型遗忘，回答不再遵守该约束。  **根因** 会话历史采用滑动窗口存储：`chat:context:{sessionId}` 是 List，`LPUSH` 写入新消息后 `LTRIM 0 9`，只保留最近 5 轮（10 ",
+      "citations": [
+        "7eff58cd83e4",
+        "19ac769e682f"
+      ],
+      "chunk_citations": [
+        "7eff58cd83e4",
+        "19ac769e682f"
+      ],
+      "commit_citations": [],
+      "fake_citations": [],
+      "unverifiable_commits": [],
+      "level": "L2_引用可溯源",
+      "is_hallucination": false,
+      "said_insufficient": true,
+      "judge": {
+        "label": "SUPPORTED",
+        "level": "A_支撑",
+        "is_misattribution": false,
+        "reason": "文档明确写了滑动窗口LTRIM保留5轮及约束被挤掉",
+        "raw_head": "{\"label\": \"SUPPORTED\", \"reason\": \"文档明确写了滑动窗口LTRIM保留5轮及约束被挤掉\"}"
+      }
+    },
+    {
+      "qid": "S4",
+      "kind": "semantic",
+      "query": "前端等了很久一个字都没收到，最后一次性全吐出来",
+      "steps": 2,
+      "degraded": false,
+      "degrade_reason": "",
+      "latency_ms": 6332,
+      "answer_chars": 1046,
+      "answer_head": "**现象** 前端长时间收不到任何 SSE 数据，连接结束时一次性收到全部内容。这是典型的“流式响应被整块缓冲”表现，并非推理慢。  **根因** 最可能的原因是网关层缓冲：Nginx 默认 `proxy_buffering on`，会把 SSE 响应积攒成整块再下发，前端表现为长时间静默后突然吐出全部内容。需要在响应",
+      "citations": [
+        "dc785e7f9562",
+        "9ecc53d9612b"
+      ],
+      "chunk_citations": [
+        "dc785e7f9562",
+        "9ecc53d9612b"
+      ],
+      "commit_citations": [],
+      "fake_citations": [],
+      "unverifiable_commits": [],
+      "level": "L2_引用可溯源",
+      "is_hallucination": false,
+      "said_insufficient": true,
+      "judge": {
+        "label": "SUPPORTED",
+        "level": "A_支撑",
+        "is_misattribution": false,
+        "reason": "文档明确记载Nginx缓冲导致长时间无输出后突然吐出",
+        "raw_head": "{\"label\": \"SUPPORTED\", \"reason\": \"文档明确记载Nginx缓冲导致长时间无输出后突然吐出\"}"
+      }
+    },
+    {
+      "qid": "S5",
+      "kind": "semantic",
+      "query": "内存里对象越来越多但是又查不出来哪个没释放",
+      "steps": 2,
+      "degraded": false,
+      "degrade_reason": "",
+      "latency_ms": 8630,
+      "answer_chars": 1335,
+      "answer_head": "**现象** 内存中对象数量持续增长，但无法定位是哪个对象没有被释放。目前尚未提供具体的异常类型、堆栈或监控数据。  **根因** 当前证据不足以确定根因。文档只给出了 OOM 的分类框架，没有针对“对象持续增长但查不出泄漏点”的具体案例。需要先区分是堆内对象泄漏、线程泄漏还是 Metaspace 泄漏，再定位引用链。",
+      "citations": [
+        "f30e24c6a75d",
+        "e711f2b311ac",
+        "7eff58cd83e4",
+        "19ac769e682f",
+        "450d5cd7d68c"
+      ],
+      "chunk_citations": [
+        "f30e24c6a75d",
+        "e711f2b311ac",
+        "7eff58cd83e4",
+        "19ac769e682f",
+        "450d5cd7d68c"
+      ],
+      "commit_citations": [],
+      "fake_citations": [],
+      "unverifiable_commits": [],
+      "level": "L2_引用可溯源",
+      "is_hallucination": false,
+      "said_insufficient": true,
+      "judge": {
+        "label": "PARTIAL",
+        "level": "B_部分支撑",
+        "is_misattribution": false,
+        "reason": "文档给出OOM分类与排查步骤，但未直接覆盖该现象",
+        "raw_head": "{\"label\": \"PARTIAL\", \"reason\": \"文档给出OOM分类与排查步骤，但未直接覆盖该现象\"}"
+      }
+    },
+    {
+      "qid": "S6",
+      "kind": "semantic",
+      "query": "用户关闭页面以后后台还在跑还一直扣钱",
+      "steps": 3,
+      "degraded": false,
+      "degrade_reason": "",
+      "latency_ms": 11100,
+      "answer_chars": 1520,
+      "answer_head": "**现象** 用户关闭浏览器页面后，后端 LLM 推理任务仍在继续执行，token 持续被消耗并计入费用。  **根因** SSE 流式链路缺少“客户端断开 → 取消上游”的联动。用户关闭页面时，连接被关闭，但服务端没有监听连接关闭事件去 cancel 下游模型调用，导致推理跑完整个任务，token 照常累加计费。这是",
+      "citations": [
+        "dc785e7f9562",
+        "973414cb4a41",
+        "9ecc53d9612b"
+      ],
+      "chunk_citations": [
+        "dc785e7f9562",
+        "973414cb4a41",
+        "9ecc53d9612b"
+      ],
+      "commit_citations": [],
+      "fake_citations": [],
+      "unverifiable_commits": [],
+      "level": "L2_引用可溯源",
+      "is_hallucination": false,
+      "said_insufficient": false,
+      "judge": {
+        "label": "SUPPORTED",
+        "level": "A_支撑",
+        "is_misattribution": false,
+        "reason": "文档明确记载客户端断开未取消下游导致token浪费",
+        "raw_head": "{\"label\": \"SUPPORTED\", \"reason\": \"文档明确记载客户端断开未取消下游导致token浪费\"}"
+      }
+    },
+    {
+      "qid": "S7",
+      "kind": "semantic",
+      "query": "怎么在只按次数收费之外控制这个成本",
+      "steps": 2,
+      "degraded": false,
+      "degrade_reason": "",
+      "latency_ms": 7630,
+      "answer_chars": 1290,
+      "answer_head": "**现象** 你目前只按请求次数（QPS/调用次数）做限流，想在此基础上进一步控制成本。按次数限流无法反映单次请求的真实开销：一次请求可能只消耗几百 token，也可能因为长上下文、长输出消耗几万 token，因此成本会失控。  **根因** 成本驱动因素是 token 消耗量，而不是请求条数。按次数限流对“少量请求、",
+      "citations": [
+        "973414cb4a41",
+        "7eff58cd83e4",
+        "3aa21b334068",
+        "9ecc53d9612b"
+      ],
+      "chunk_citations": [
+        "973414cb4a41",
+        "7eff58cd83e4",
+        "3aa21b334068",
+        "9ecc53d9612b"
+      ],
+      "commit_citations": [],
+      "fake_citations": [],
+      "unverifiable_commits": [],
+      "level": "L2_引用可溯源",
+      "is_hallucination": false,
+      "said_insufficient": false,
+      "judge": {
+        "label": "SUPPORTED",
+        "level": "A_支撑",
+        "is_misattribution": false,
+        "reason": "文档明确写按次数限流无法控制成本，应按token计费",
+        "raw_head": "{\"label\": \"SUPPORTED\", \"reason\": \"文档明确写按次数限流无法控制成本，应按token计费\"}"
+      }
+    },
+    {
+      "qid": "S8",
+      "kind": "semantic",
+      "query": "两个搜索分数一个是 20 多一个是 0.8 怎么合并",
+      "steps": 2,
+      "degraded": false,
+      "degrade_reason": "",
+      "latency_ms": 7589,
+      "answer_chars": 1076,
+      "answer_head": "**现象** 两路检索返回的分数值域差异极大：一路是 20 多（典型 BM25 分数），另一路是 0.8（典型余弦相似度）。直接相加或加权求和，会让 BM25 那一路完全支配最终排序。  **根因** 这两类分数在数学上不可比。BM25 受文档长度和词频影响，典型值域为 0~30；余弦相似度为 -1~1。即使做 min",
+      "citations": [
+        "74e0be2668a2",
+        "2c71be076630",
+        "8a8bc5f2bbcb"
+      ],
+      "chunk_citations": [
+        "74e0be2668a2",
+        "2c71be076630",
+        "8a8bc5f2bbcb"
+      ],
+      "commit_citations": [],
+      "fake_citations": [],
+      "unverifiable_commits": [],
+      "level": "L2_引用可溯源",
+      "is_hallucination": false,
+      "said_insufficient": false,
+      "judge": {
+        "label": "SUPPORTED",
+        "level": "A_支撑",
+        "is_misattribution": false,
+        "reason": "文档明确说明BM25与余弦值域不可比及典型范围",
+        "raw_head": "{\"label\": \"SUPPORTED\", \"reason\": \"文档明确说明BM25与余弦值域不可比及典型范围\"}"
+      }
+    },
+    {
+      "qid": "M1",
+      "kind": "mixed",
+      "query": "线上一直报 Communications link failure 但数据库明明是好的",
+      "steps": 3,
+      "degraded": false,
+      "degrade_reason": "",
+      "latency_ms": 9680,
+      "answer_chars": 1770,
+      "answer_head": "**现象**  线上持续报 `Communications link failure`，但数据库本身健康（无宕机、无重启、无连接数打满）。这类报错的特征是：数据库侧一切正常，应用侧却周期性拿到\"已死\"的连接。  **根因**  `Communications link failure` 在本系统的错误码对照表中被明确定",
+      "citations": [
+        "450d5cd7d68c",
+        "129c252591f3",
+        "3ce3b7dc9945"
+      ],
+      "chunk_citations": [
+        "450d5cd7d68c",
+        "129c252591f3",
+        "3ce3b7dc9945"
+      ],
+      "commit_citations": [],
+      "fake_citations": [],
+      "unverifiable_commits": [],
+      "level": "L2_引用可溯源",
+      "is_hallucination": false,
+      "said_insufficient": true,
+      "judge": {
+        "label": "UNSUPPORTED",
+        "level": "C_不支撑",
+        "is_misattribution": true,
+        "reason": "日志无Communications link failure，实为NPE反序列化错误",
+        "raw_head": "{\"label\": \"UNSUPPORTED\", \"reason\": \"日志无Communications link failure，实为NPE反序列化错误\"}"
+      }
+    },
+    {
+      "qid": "M2",
+      "kind": "mixed",
+      "query": "日志里 ConcurrentModificationException 和 PrefixLogger 一起出现是什么情况",
+      "steps": 2,
+      "degraded": false,
+      "degrade_reason": "",
+      "latency_ms": 6535,
+      "answer_chars": 1154,
+      "answer_head": "**现象** 你提到日志中 `ConcurrentModificationException` 与 `PrefixLogger` 同时出现。目前我还没有看到实际堆栈，因此无法确认两者的关系。  **根因** 当前证据不足，无法给出根因。  **证据** - 检索 `ConcurrentModificationExcep",
+      "citations": [
+        "e62d71fc0f58",
+        "195fd4ad638e",
+        "19ac8d76e2e7",
+        "d758749fd1b7",
+        "298b907c874e",
+        "19ac769e682f",
+        "7eff58cd83e4",
+        "3aa21b334068",
+        "129c252591f3",
+        "3ce3b7dc9945",
+        "9ecc53d9612b"
+      ],
+      "chunk_citations": [
+        "e62d71fc0f58",
+        "195fd4ad638e",
+        "19ac8d76e2e7",
+        "d758749fd1b7",
+        "298b907c874e",
+        "19ac769e682f",
+        "7eff58cd83e4",
+        "3aa21b334068",
+        "129c252591f3",
+        "3ce3b7dc9945",
+        "9ecc53d9612b"
+      ],
+      "commit_citations": [],
+      "fake_citations": [],
+      "unverifiable_commits": [],
+      "level": "L2_引用可溯源",
+      "is_hallucination": false,
+      "said_insufficient": true,
+      "judge": {
+        "label": "UNSUPPORTED",
+        "level": "C_不支撑",
+        "is_misattribution": true,
+        "reason": "文档片段均未涉及ConcurrentModificationException或PrefixLogger",
+        "raw_head": "{\"label\": \"UNSUPPORTED\", \"reason\": \"文档片段均未涉及ConcurrentModificationException或PrefixLogger\"}"
+      }
+    },
+    {
+      "qid": "M3",
+      "kind": "mixed",
+      "query": "为什么两边都写了超时结果前端还是拿到半截",
+      "steps": 2,
+      "degraded": false,
+      "degrade_reason": "",
+      "latency_ms": 6982,
+      "answer_chars": 1127,
+      "answer_head": "**现象** 前端收到的是被截断的半截流式内容，而不是完整结果或明确错误。  **根因** “两边都写了超时”并不等于超时配置正确。文档明确要求**外层超时必须大于内层**，并且 `SseEmitter` 的 timeout 必须大于 Python 侧整任务超时。如果两处超时值相等或内层更大，就会出现“后端还在推理、连",
+      "citations": [
+        "dc785e7f9562",
+        "9ecc53d9612b",
+        "129c252591f3"
+      ],
+      "chunk_citations": [
+        "dc785e7f9562",
+        "9ecc53d9612b",
+        "129c252591f3"
+      ],
+      "commit_citations": [],
+      "fake_citations": [],
+      "unverifiable_commits": [],
+      "level": "L2_引用可溯源",
+      "is_hallucination": false,
+      "said_insufficient": true,
+      "judge": {
+        "label": "SUPPORTED",
+        "level": "A_支撑",
+        "is_misattribution": false,
+        "reason": "文档明确要求外层超时大于内层，否则前端拿半截",
+        "raw_head": "{\"label\": \"SUPPORTED\", \"reason\": \"文档明确要求外层超时大于内层，否则前端拿半截\"}"
+      }
+    },
+    {
+      "qid": "M4",
+      "kind": "mixed",
+      "query": "OOM 之后怎么确认是内存泄漏还是确实就是对象太多",
+      "steps": 2,
+      "degraded": false,
+      "degrade_reason": "",
+      "latency_ms": 9691,
+      "answer_chars": 1581,
+      "answer_head": "**现象**  OOM 发生后，需要区分两种情况：一是对象被意外长期持有，也就是内存泄漏；二是对象数量确实随业务量增长，也就是容量不足。两者的处置方式完全不同：前者要改代码，后者要扩容或加缓存上限。  **根因**  内部手册把 OOM 的判定拆成两步：先按错误类型分类，再对堆内对象做引用链分析。`java.lang.",
+      "citations": [
+        "f30e24c6a75d",
+        "e711f2b311ac",
+        "7b99964d5a55"
+      ],
+      "chunk_citations": [
+        "f30e24c6a75d",
+        "e711f2b311ac",
+        "7b99964d5a55"
+      ],
+      "commit_citations": [],
+      "fake_citations": [],
+      "unverifiable_commits": [],
+      "level": "L2_引用可溯源",
+      "is_hallucination": false,
+      "said_insufficient": true,
+      "judge": {
+        "label": "PARTIAL",
+        "level": "B_部分支撑",
+        "is_misattribution": false,
+        "reason": "文档支持OOM分类与引用链分析，但未明确区分泄漏与容量不足的处置差异",
+        "raw_head": "{\"label\": \"PARTIAL\", \"reason\": \"文档支持OOM分类与引用链分析，但未明确区分泄漏与容量不足的处置差异\"}"
+      }
+    },
+    {
+      "qid": "M5",
+      "kind": "mixed",
+      "query": "LEAK_DETECTION_THRESHOLD 开了但没打印任何东西",
+      "steps": 2,
+      "degraded": false,
+      "degrade_reason": "",
+      "latency_ms": 9276,
+      "answer_chars": 1870,
+      "answer_head": "**现象** 开启 `leak-detection-threshold` 后，日志中没有任何泄漏告警输出。  **根因** 当前证据不足以确定唯一根因，但文档给出了该机制的工作前提，最可能的原因是**没有连接真正超过阈值被占用**，而不是配置没生效：  1. `leakDetectionThreshold` 是\"连接被",
+      "citations": [
+        "7b99964d5a55",
+        "450d5cd7d68c",
+        "638ebe60d964",
+        "3ce3b7dc9945"
+      ],
+      "chunk_citations": [
+        "7b99964d5a55",
+        "450d5cd7d68c",
+        "638ebe60d964",
+        "3ce3b7dc9945"
+      ],
+      "commit_citations": [],
+      "fake_citations": [],
+      "unverifiable_commits": [],
+      "level": "L2_引用可溯源",
+      "is_hallucination": false,
+      "said_insufficient": true,
+      "judge": {
+        "label": "PARTIAL",
+        "level": "B_部分支撑",
+        "is_misattribution": false,
+        "reason": "文档仅说明开启阈值可拿堆栈，未解释无输出原因，属合理外推",
+        "raw_head": "{\"label\": \"PARTIAL\", \"reason\": \"文档仅说明开启阈值可拿堆栈，未解释无输出原因，属合理外推\"}"
+      }
+    },
+    {
+      "qid": "M6",
+      "kind": "mixed",
+      "query": "413 上传超了但是 client_max_body_size 改过还是没用",
+      "steps": 3,
+      "degraded": false,
+      "degrade_reason": "",
+      "latency_ms": 12200,
+      "answer_chars": 1862,
+      "answer_head": "**现象** 上传大文件时返回 `413 Request Entity Too Large`；已经修改过 `client_max_body_size`，但问题仍然存在。  **根因** 当前证据不足以确定具体根因。内部文档只给出了“413 对应调 `client_max_body_size`”这一条通用指引，没有覆盖“",
+      "citations": [
+        "129c252591f3",
+        "9ecc53d9612b",
+        "75d699f6e8f8"
+      ],
+      "chunk_citations": [
+        "129c252591f3",
+        "9ecc53d9612b",
+        "75d699f6e8f8"
+      ],
+      "commit_citations": [],
+      "fake_citations": [],
+      "unverifiable_commits": [],
+      "level": "L2_引用可溯源",
+      "is_hallucination": false,
+      "said_insufficient": true,
+      "judge": {
+        "label": "PARTIAL",
+        "level": "B_部分支撑",
+        "is_misattribution": false,
+        "reason": "文档仅确认413对应调client_max_body_size，未覆盖改后仍无效的根因",
+        "raw_head": "{\"label\": \"PARTIAL\", \"reason\": \"文档仅确认413对应调client_max_body_size，未覆盖改后仍无效的根因\"}"
+      }
+    },
+    {
+      "qid": "M7",
+      "kind": "mixed",
+      "query": "429 返回了但是不知道剩余额度还剩多少",
+      "steps": 2,
+      "degraded": false,
+      "degrade_reason": "",
+      "latency_ms": 7461,
+      "answer_chars": 1140,
+      "answer_head": "**现象** 调用方收到 429，但响应里拿不到剩余额度（remaining quota）信息，无法判断还能用多少、何时恢复。  **根因** 按内部手册的 Token 额度限流设计，额度累加在 `token:quota:{userId}:{date}` 上，超限时\"返回 429 并附剩余额度\"——即剩余额度是**要求",
+      "citations": [
+        "973414cb4a41",
+        "3aa21b334068",
+        "129c252591f3"
+      ],
+      "chunk_citations": [
+        "973414cb4a41",
+        "3aa21b334068",
+        "129c252591f3"
+      ],
+      "commit_citations": [],
+      "fake_citations": [],
+      "unverifiable_commits": [],
+      "level": "L2_引用可溯源",
+      "is_hallucination": false,
+      "said_insufficient": true,
+      "judge": {
+        "label": "PARTIAL",
+        "level": "B_部分支撑",
+        "is_misattribution": false,
+        "reason": "文档说超限返回429并附剩余额度，但结论称拿不到额度，属现象与设计矛盾的外推",
+        "raw_head": "{\"label\": \"PARTIAL\", \"reason\": \"文档说超限返回429并附剩余额度，但结论称拿不到额度，属现象与设计矛盾的外推\"}"
+      }
+    },
+    {
+      "qid": "M8",
+      "kind": "mixed",
+      "query": "SSE 一直断 是不是网关把连接杀了",
+      "steps": 2,
+      "degraded": false,
+      "degrade_reason": "",
+      "latency_ms": 7905,
+      "answer_chars": 1224,
+      "answer_head": "**现象** SSE 流式响应连接反复中断。用户怀疑是网关主动断开连接。  **根因** “网关杀连接”只是四种可能原因之一，不能直接认定。文档列出的 SSE 中断原因有四个，需要逐项排除： 1. **Nginx buffering**：`proxy_buffering` 默认开启，会把流式响应积攒成整块返回。表现是长",
+      "citations": [
+        "dc785e7f9562",
+        "9ecc53d9612b",
+        "129c252591f3"
+      ],
+      "chunk_citations": [
+        "dc785e7f9562",
+        "9ecc53d9612b",
+        "129c252591f3"
+      ],
+      "commit_citations": [],
+      "fake_citations": [],
+      "unverifiable_commits": [],
+      "level": "L2_引用可溯源",
+      "is_hallucination": false,
+      "said_insufficient": true,
+      "judge": {
+        "label": "SUPPORTED",
+        "level": "A_支撑",
+        "is_misattribution": false,
+        "reason": "文档明确列出SSE中断四原因，含网关空闲杀连接",
+        "raw_head": "{\"label\": \"SUPPORTED\", \"reason\": \"文档明确列出SSE中断四原因，含网关空闲杀连接\"}"
+      }
+    },
+    {
+      "qid": "M9",
+      "kind": "mixed",
+      "query": "多态反序列化 type 字段对不上为什么没报错而是空指针",
+      "steps": 2,
+      "degraded": false,
+      "degrade_reason": "",
+      "latency_ms": 6585,
+      "answer_chars": 1104,
+      "answer_head": "**现象** 多态反序列化时，JSON 里的 `type` 字段值与已注册子类型不匹配，但反序列化过程没有抛出异常，而是返回了 `null`；随后调用方在业务代码里访问该对象时抛出 NullPointerException。  **根因** `@JsonSubTypes` 类型解析失败时，Jackson 的 `Type",
+      "citations": [
+        "195fd4ad638e",
+        "19ac8d76e2e7",
+        "e62d71fc0f58"
+      ],
+      "chunk_citations": [
+        "195fd4ad638e",
+        "19ac8d76e2e7",
+        "e62d71fc0f58"
+      ],
+      "commit_citations": [],
+      "fake_citations": [],
+      "unverifiable_commits": [],
+      "level": "L2_引用可溯源",
+      "is_hallucination": false,
+      "said_insufficient": false,
+      "judge": {
+        "label": "SUPPORTED",
+        "level": "A_支撑",
+        "is_misattribution": false,
+        "reason": "文档明确写type不匹配时Jackson返回null而非报错",
+        "raw_head": "{\"label\": \"SUPPORTED\", \"reason\": \"文档明确写type不匹配时Jackson返回null而非报错\"}"
+      }
+    }
+  ]
+}

@@ -1,20 +1,27 @@
-"""检索层：切块 + BM25 + 向量 + RRF 融合。
+"""检索层：切块 + BM25 + 向量 + RRF 融合 + rerank 精排。
 
 面试要点：
 - 切块按结构（标题层级）而不是定长 512 token，块前缀拼 header_path。
 - 混合检索用 RRF 融合排名，不给两路分数加权求和（分数不可比）。
 - metadata ACL 过滤在检索层做，不靠 prompt 约束模型。
 - 没有 embedding key 时自动降级为纯 BM25，保证代码随时能跑。
+- rerank 带阈值闸门：reranker 没把握时分数整体塌到 0.01 量级却照样给顺序，
+  直接采信会把它"噪声排序"覆盖掉本来对的 RRF 结果（D5 实测坏了 4 条）。
 """
 from __future__ import annotations
 
 import hashlib
 import json
 import re
+import time
+import urllib.request
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 import config
+
+# search() 的形参也叫 rerank，会遮蔽模块级函数，所以这里起个别名再引用
+rerank_query = None   # 在 rerank() 定义之后绑定（见文件下方）
 
 HEADER_RE = re.compile(r"^(#{1,6})\s+(.*)$")
 
@@ -94,7 +101,8 @@ class Retriever:
         self.chunks: list[Chunk] = []
         self._bm25 = None
         self._tokenized: list[list[str]] = []
-        self._collection = None
+        self._vectors = None          # numpy float32 [n, dim]，L2 归一化后存
+        self._vec_dim = 0
         self.embedding_enabled = False
 
     # ---- 建索引 ----
@@ -135,29 +143,21 @@ class Retriever:
         print(f"[ok] 建索引完成：{len(self.chunks)} 个 chunk，向量={self.embedding_enabled}")
 
     def _build_vector(self) -> None:
-        import chromadb
+        """调 embedding API 拿到全部 chunk 的向量，存成本地 .npy。
 
-        client = chromadb.PersistentClient(path=str(config.INDEX_DIR / "chroma"))
-        try:
-            client.delete_collection("kb")
-        except Exception:  # noqa: BLE001
-            pass
-        embed_fn = _embedding_function()
-        self._collection = client.get_or_create_collection(
-            name="kb", embedding_function=embed_fn, metadata={"hnsw:space": "cosine"}
+        为什么不用 chromadb：24 个 chunk 用 ANN 是杀鸡用牛刀，暴力余弦 3ms 就能算完，
+        而且能避开 chromadb 版本间 embedding function 参数名不一致的坑。
+        向量库真正需要 ANN 的临界点大概在十万级以上。
+        """
+        import numpy as np
+
+        vecs = embed_texts([c.embedding_text() for c in self.chunks])
+        self._vectors = _l2_normalize(np.asarray(vecs, dtype=np.float32))
+        self._vec_dim = self._vectors.shape[1]
+        np.save(config.INDEX_DIR / "vectors.npy", self._vectors)
+        (config.INDEX_DIR / "vector_ids.json").write_text(
+            json.dumps([c.chunk_id for c in self.chunks], ensure_ascii=False), encoding="utf-8"
         )
-        B = 64
-        for i in range(0, len(self.chunks), B):
-            batch = self.chunks[i : i + B]
-            self._collection.add(
-                ids=[c.chunk_id for c in batch],
-                documents=[c.embedding_text() for c in batch],
-                metadatas=[
-                    {"doc": c.doc, "header_path": c.header_path,
-                     "groups": ",".join(c.allowed_groups)}
-                    for c in batch
-                ],
-            )
 
     # ---- 加载已有索引（CLI/评测脚本复用，避免重复调 embedding） ----
     def load(self) -> None:
@@ -172,11 +172,19 @@ class Retriever:
 
         meta = json.loads((config.INDEX_DIR / "meta.json").read_text(encoding="utf-8"))
         if meta.get("embedding_enabled"):
-            import chromadb
+            vec_file = config.INDEX_DIR / "vectors.npy"
+            ids_file = config.INDEX_DIR / "vector_ids.json"
+            if not vec_file.exists() or not ids_file.exists():
+                raise RuntimeError("向量索引文件缺失，先重新跑 python build_index.py")
+            import numpy as np
 
-            client = chromadb.PersistentClient(path=str(config.INDEX_DIR / "chroma"))
-            embed_fn = _embedding_function()
-            self._collection = client.get_or_create_collection(name="kb", embedding_function=embed_fn)
+            self._vectors = np.load(vec_file)
+            self._vec_dim = self._vectors.shape[1]
+            saved_ids = json.loads(ids_file.read_text(encoding="utf-8"))
+            if saved_ids != [c.chunk_id for c in self.chunks]:
+                raise RuntimeError(
+                    "向量索引与 chunks.json 顺序不一致（语料变了？），重新跑 build_index.py"
+                )
             self.embedding_enabled = True
 
     # ---- 检索 ----
@@ -186,6 +194,8 @@ class Retriever:
         top_k: int = config.FINAL_TOP_K,
         user_groups: list[str] | None = None,
         mode: str = "hybrid",          # hybrid | bm25 | vector，用于 D5 的对比实验
+        rerank: bool | None = None,    # None = 跟随 config.RERANK_ENABLED
+        stats: dict | None = None,     # 传入则回填 rerank 决策与耗时，供评测/调试读取
     ) -> list[dict]:
         user_groups = user_groups or []
         allowed_ids = {
@@ -202,31 +212,90 @@ class Retriever:
             bm25_rank = [self.chunks[i].chunk_id for i in order if self.chunks[i].chunk_id in allowed_ids]
 
         vec_rank: list[str] = []
-        if mode in ("hybrid", "vector") and self._collection is not None:
-            res = self._collection.query(query_texts=[query], n_results=min(config.RETRIEVE_TOP_K * 2, max(len(self.chunks), 1)))
-            for cid in (res.get("ids") or [[]])[0]:
-                if cid in allowed_ids:
-                    vec_rank.append(cid)
+        if mode in ("hybrid", "vector") and self._vectors is not None:
+            order = self._vector_order(query)
+            vec_rank = [self.chunks[i].chunk_id for i in order if self.chunks[i].chunk_id in allowed_ids]
 
         if mode == "bm25":
             fused = bm25_rank
         elif mode == "vector":
+            if self._vectors is None:
+                # 显式报错而不是返回空列表：空列表会被评测脚本当成"向量检索 0 分"，
+                # 得出完全错误的结论。宁可崩，也不要静默出一个假数字。
+                raise RuntimeError("请求了 vector 检索但向量索引未启用（无 EMBEDDING_API_KEY 或未建索引）")
             fused = vec_rank
-        elif self._collection is None:
-            # hybrid 但向量库不可用 → 自动降级为纯 BM25
+        elif self._vectors is None:
+            # hybrid 但向量不可用 → 自动降级为纯 BM25（trace 里会标明）
             fused = bm25_rank
         else:
             fused = self._rrf([r[: config.RETRIEVE_TOP_K] for r in (bm25_rank, vec_rank)])
 
         by_id = {c.chunk_id: c for c in self.chunks}
+        idx_of = {c.chunk_id: i for i, c in enumerate(self.chunks)}
+
+        # ---- rerank 闸门 ----
+        # 只精排"融合后的头部候选"，不是全量：精排收益集中在头部，
+        # 而延迟和候选数成正比（每个 [query, doc] 都要过一次模型）。
+        use_rerank = config.RERANK_ENABLED if rerank is None else rerank
+        apply_rerank = False
+        rerank_top1 = 0.0
+        rerank_ms = 0.0
+        if use_rerank and mode in ("hybrid", "vector") and len(fused) > 1:
+            cand = fused[: config.RERANK_CANDIDATES]
+            try:
+                t0 = time.perf_counter()
+                scores = rerank_query(query, [by_id[c].text for c in cand])
+                rerank_ms = (time.perf_counter() - t0) * 1000
+                order = sorted(range(len(cand)), key=lambda i: -scores[i])
+                rerank_top1 = scores[order[0]] if order else 0.0
+                # 闸门：top1 分数够高才采信。低分说明 reranker 自己也没把握，
+                # 它仍会给一个顺序，但那是噪声排序——此时保留 RRF 原序更安全。
+                if rerank_top1 >= config.RERANK_MIN_SCORE:
+                    fused = [cand[i] for i in order] + fused[len(cand):]
+                    apply_rerank = True
+            except Exception as e:                      # 网络/限流/超时：降级，不中断检索
+                rerank_ms = -1.0
+                if stats is not None:
+                    stats["rerank_error"] = f"{type(e).__name__}: {e}"
+        if stats is not None:
+            stats.update({
+                "rerank_requested": use_rerank,
+                "rerank_applied": apply_rerank,
+                "rerank_top1": round(rerank_top1, 4),
+                "rerank_ms": round(rerank_ms, 1),
+            })
+
+        # 只为展示/调试算一次原始分数：BM25 是稀疏打分（可到 20+），余弦恒在 [-1,1]，
+        # 两者不可比——这正是融合用 RRF 的原因，这里的分数绝不参与融合。
+        bm25_scores = self._bm25.get_scores(tokenize(query)) if mode in ("hybrid", "bm25") and self._bm25 else None
+        q_vec = None
+        if mode in ("hybrid", "vector") and self._vectors is not None:
+            import numpy as np          # 局部导入：numpy 只在向量路径需要
+            q_vec = _l2_normalize(np.asarray(embed_texts([query]), dtype=np.float32))[0]
+
         out = []
         for rank, cid in enumerate(fused[:top_k]):
             c = by_id[cid]
-            out.append({
+            item = {
                 "chunk_id": c.chunk_id, "doc": c.doc, "header_path": c.header_path,
                 "text": c.text, "rank": rank + 1,
-            })
+            }
+            if rank == 0:
+                item["scores"] = {}
+                if bm25_scores is not None:
+                    item["scores"]["bm25"] = round(float(bm25_scores[idx_of[cid]]), 3)
+                if q_vec is not None:
+                    item["scores"]["cosine"] = round(float(self._vectors[idx_of[cid]] @ q_vec), 4)
+            out.append(item)
         return out
+
+    def _vector_order(self, query: str) -> list[int]:
+        """暴力余弦检索：向量已 L2 归一化，点积即余弦相似度。返回按分数降序的 chunk 下标。"""
+        import numpy as np
+
+        q = _l2_normalize(np.asarray(embed_texts([query]), dtype=np.float32))[0]
+        scores = self._vectors @ q
+        return list(np.argsort(-scores))
 
     @staticmethod
     def _rrf(rank_lists: list[list[str]], k: int = config.RRF_K) -> list[str]:
@@ -238,6 +307,47 @@ class Retriever:
         return sorted(agg, key=lambda x: -agg[x])
 
 
+# ---------------- Rerank（cross-encoder 精排） ----------------
+
+def rerank(query: str, docs: list[str], timeout: float | None = None) -> list[float]:
+    """对 [query, 每个 doc] 成对打分，返回与 docs 同序的分数列表。
+
+    和 embedding 检索的本质区别：
+    - 双塔（bi-encoder）：query 和 doc 各自编码，最后算余弦。快，但两者从没见过面。
+    - 交叉编码（cross-encoder）：query 和 doc 拼在一起过模型，能看到"这个词在这句话里"的交互。
+      慢（每个候选都要过一次模型），但准得多——实测同一对内容，bge-m3 的余弦差只有 0.08，
+      而 reranker 给出 0.93 vs 0.01。
+
+    失败不吞异常：rerank 挂了就当它没开，让上层显式决定降级，别悄悄返回原序假装成功。
+    """
+    if not docs:
+        return []
+    if not config.EMBEDDING_API_KEY:
+        raise RuntimeError("EMBEDDING_API_KEY 未配置，无法调用 rerank")
+
+    body = {"model": config.RERANK_MODEL, "query": query, "documents": docs}
+    req = urllib.request.Request(
+        config.EMBEDDING_BASE_URL.rstrip("/") + "/rerank",
+        data=json.dumps(body).encode("utf-8"),
+        headers={"Authorization": f"Bearer {config.EMBEDDING_API_KEY}",
+                 "Content-Type": "application/json"},
+    )
+    with urllib.request.urlopen(req, timeout=timeout or config.RERANK_TIMEOUT) as resp:
+        data = json.loads(resp.read().decode("utf-8"))
+
+    # 接口返回的是 [{index, relevance_score}]，可能不带 top_n 时是全量；
+    # 按 index 回填，保证与入参 docs 同序 —— 顺序错位会导致"分数配错文档"，静默且致命。
+    scores = [0.0] * len(docs)
+    for r in data.get("results", []):
+        i = int(r["index"])
+        if 0 <= i < len(docs):
+            scores[i] = float(r["relevance_score"])
+    return scores
+
+
+rerank_query = rerank
+
+
 # ---------------- 分词 ----------------
 
 _STOP = set("的 了 是 在 我 有 和 就 不 人 都 一 一个 上 也 很 到 说 要 去 你 会 着 没有 看 好 自己 这".split())
@@ -245,7 +355,13 @@ _jieba = None
 
 
 def tokenize(text: str) -> list[str]:
-    """中文用 jieba 分词，英文/标识符按词切，统一小写。串类名要能整体匹配到。"""
+    """中文分词，英文/标识符按词切，统一小写。
+
+    三档降级，D5 评测校准过顺序（别凭直觉改）：jieba > 二元组 > 整句。
+    「整句」那一档是最坏的：正则 `[\\u4e00-\\u9fa5]{2,}` 会把一句中文切成一整个 token，
+    BM25 全库零命中，所有分都是 0，排序退化成「按文档 id」——看起来没报错，实际已经瞎了。
+    这不是假想敌：D5 第一次跑时 jieba 没装，semantic 档 recall@5 只有 0.125，根因就是它。
+    """
     global _jieba
     if _jieba is None:
         try:
@@ -254,41 +370,86 @@ def tokenize(text: str) -> list[str]:
             _jieba = jieba
         except ImportError:
             _jieba = False
+    raw = text                       # 驼峰边界必须先看原文，lower 之后 CamelCase 就没了
     lowered = text.lower()
-    words: list[str] = []
+
     if _jieba:
         words = [w.strip() for w in _jieba.lcut(lowered)]
+        # jieba 不认标识符，驼峰/下划线拆分单独补一遍
+        for ident in re.findall(r"[A-Za-z][A-Za-z0-9_.\-]*", raw):
+            words.append(ident.lower())
+            words.extend(_split_identifier(ident))
     else:
-        words = re.findall(r"[a-z_][a-z0-9_.]{1,}|[\u4e00-\u9fa5]{2,}", lowered)
+        # 英文/标识符整词保留；连续中文取字二元组，保证「限流」「超时」这类词能拆出来
+        words = []
+        for m in re.finditer(r"[a-z_][a-z0-9_.\-]{1,}|[\u4e00-\u9fa5]+", lowered):
+            tok = m.group(0)
+            if "\u4e00" <= tok[0] <= "\u9fa5":
+                bigrams = [tok[i:i + 2] for i in range(len(tok) - 1)]
+                words.extend(bigrams if bigrams else [tok])
+            else:
+                words.append(tok)
+        # 驼峰边界要用原文，lower 过的整句拆不出 CamelCase
+        for ident in re.findall(r"[A-Za-z][A-Za-z0-9_.\-]*", raw):
+            words.extend(_split_identifier(ident))
+
     return [w for w in words if w and w not in _STOP and not w.isspace()]
 
 
-def _embedding_function():
-    """构造 chromadb 的 OpenAI 兼容 embedding function。
+def _split_identifier(tok: str) -> list[str]:
+    """把 `leak_detection_threshold` / `leakDetectionThreshold` / `a.b.c` 拆成原子词。
 
-    不同 chromadb 版本这个函数的参数名不一致（api_base / api_base_url / api_base_url），
-    这里按签名探测，避免用户升级版本后直接崩在初始化。
+    D5 评测里 M5 是唯一一条 BM25 漏召回的题，根因就是这个：
+    语料写 `leakDetectionThreshold`，用户查 `LEAK_DETECTION_THRESHOLD`，
+    lower 之后是两个不同的 token，查询最重的那一票直接投空，全库 0 分。
+    同一个配置项在代码、配置、日志、提问里会有四种拼法，分词层不统一就必挂。
+
+    做法：原词保留（精确匹配仍有价值）+ 追加按 `_ - .` 与驼峰边界拆出的原子词。
     """
-    import inspect
+    if not re.search(r"[_\-.]|[a-z][A-Z]", tok):
+        return []
+    parts = [p for p in re.split(r"[_\-.\s]+", tok) if p]
+    out: list[str] = []
+    for p in parts:
+        out.extend(x.lower() for x in re.findall(r"[A-Z]?[a-z]+|\d+|[A-Z]+(?![a-z])", p))
+    # 只有拆出 2 个以上原子词时才回填，避免把单词本身重复计入两次
+    return out if len(out) > 1 or (out and out[0] != tok) else []
 
-    from chromadb.utils import embedding_functions
 
-    fn_cls = embedding_functions.OpenAIEmbeddingFunction
-    params = inspect.signature(fn_cls.__init__).parameters
-    kwargs = {"api_key": config.EMBEDDING_API_KEY, "model_name": config.EMBEDDING_MODEL}
+def _embedding_function():
+    """已废弃：改用 `embed_texts()` 直接调 API + numpy 暴力检索。
 
-    if "api_base" in params:
-        kwargs["api_base"] = config.EMBEDDING_BASE_URL
-    elif "api_base_url" in params:
-        kwargs["api_base_url"] = config.EMBEDDING_BASE_URL
-    elif "base_url" in params:
-        kwargs["base_url"] = config.EMBEDDING_BASE_URL
-    else:
-        raise RuntimeError(
-            f"当前 chromadb 版本的 OpenAIEmbeddingFunction 不支持自定义 base_url，"
-            f"可用参数：{list(params)}。请升级 chromadb 或改用 RAG_BM25_ONLY=true。"
-        )
-    return fn_cls(**kwargs)
+    保留这个函数名只为兼容旧引用，调用会直接报错，避免有人以为它还在生效。
+    """
+    raise RuntimeError(
+        "chromadb 路径已移除，请使用 embed_texts()（直接调 OpenAI 兼容 embedding 接口 + numpy 余弦）"
+    )
+
+
+def embed_texts(texts: list[str], batch_size: int = 32) -> list[list[float]]:
+    """调 OpenAI 兼容的 /embeddings 接口。兼容硅基流动、OpenAI、智谱等。
+
+    失败不吞异常：向量检索要不要降级是**调用方**的决定，
+    这里悄悄返回零向量会让"向量检索结果异常"变成一个极难发现的坑。
+    """
+    from openai import OpenAI
+
+    if not config.EMBEDDING_API_KEY:
+        raise RuntimeError("EMBEDDING_API_KEY 未配置，无法做向量检索")
+
+    client = OpenAI(api_key=config.EMBEDDING_API_KEY, base_url=config.EMBEDDING_BASE_URL)
+    out: list[list[float]] = []
+    for i in range(0, len(texts), batch_size):
+        batch = texts[i : i + batch_size]
+        resp = client.embeddings.create(model=config.EMBEDDING_MODEL, input=batch)
+        # 按 index 排序，不依赖返回顺序（部分网关会乱序返回）
+        out.extend(d.embedding for d in sorted(resp.data, key=lambda d: d.index))
+    return out
+
+
+def _l2_normalize(arr):
+    norm = (arr ** 2).sum(axis=1, keepdims=True) ** 0.5
+    return arr / (norm + 1e-12)
 
 
 def _groups_from_filename(p: Path) -> list[str]:

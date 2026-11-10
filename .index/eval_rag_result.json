@@ -1,0 +1,215 @@
+{
+  "modes": {
+    "bm25": {
+      "overall": {
+        "recall@1": 0.8333333333333334,
+        "recall@3": 0.9791666666666666,
+        "recall@5": 1.0,
+        "mrr": 0.9305555555555557,
+        "ndcg@5": 0.9421751838615696,
+        "miss": 0
+      },
+      "by_kind": {
+        "lexical": {
+          "recall@1": 1.0,
+          "recall@3": 1.0,
+          "recall@5": 1.0,
+          "mrr": 1.0,
+          "ndcg@5": 1.0,
+          "miss": 0
+        },
+        "semantic": {
+          "recall@1": 0.75,
+          "recall@3": 1.0,
+          "recall@5": 1.0,
+          "mrr": 0.8541666666666666,
+          "ndcg@5": 0.8913662191964322,
+          "miss": 0
+        },
+        "mixed": {
+          "recall@1": 0.75,
+          "recall@3": 0.9375,
+          "recall@5": 1.0,
+          "mrr": 0.9375,
+          "ndcg@5": 0.9351593323882765,
+          "miss": 0
+        }
+      },
+      "control": [
+        {
+          "qid": "M2",
+          "query": "日志里 ConcurrentModificationException 和 PrefixLogger 一起出现是什么情况",
+          "top1": {
+            "chunk_id": "195fd4ad638e",
+            "doc": "故障排查手册",
+            "header_path": "常见故障排查手册 > 1. NullPointerException 排查 > 1.1 典型成因",
+            "text": "Jackson 反序列化场景下的 NPE 有三类高频原因，按出现频率排序：\n\n1. **字段缺失后未判空**：上游返回的 JSON 中缺少某个字段，`@JsonProperty` 未标 `required`，\n   反序列化为 null 后直接参与运算。日志特征为 NPE 出现在 DTO 的 getter 调用之后。\n2. **`@JsonSubTypes` 类型解析失败**：多态反序列化时 type 字段值不在已注册子类型中，\n   Jackson 不会报错而是返回 null，调用方 NPE。特征是堆栈里出现 `TypeDeserializer`。\n3. **静态初始化顺序**：`ObjectMapper` 被声明为 static 且在静态块中被提前使用。",
+            "rank": 1,
+            "scores": {
+              "bm25": 5.565
+            }
+          }
+        }
+      ]
+    },
+    "vector": {
+      "overall": {
+        "recall@1": 0.7083333333333334,
+        "recall@3": 0.8958333333333334,
+        "recall@5": 0.9583333333333334,
+        "mrr": 0.835813492063492,
+        "ndcg@5": 0.8559533737812943,
+        "miss": 1
+      },
+      "by_kind": {
+        "lexical": {
+          "recall@1": 1.0,
+          "recall@3": 1.0,
+          "recall@5": 1.0,
+          "mrr": 1.0,
+          "ndcg@5": 1.0,
+          "miss": 0
+        },
+        "semantic": {
+          "recall@1": 0.5,
+          "recall@3": 0.75,
+          "recall@5": 0.875,
+          "mrr": 0.6532738095238095,
+          "ndcg@5": 0.6952007889556063,
+          "miss": 1
+        },
+        "mixed": {
+          "recall@1": 0.625,
+          "recall@3": 0.9375,
+          "recall@5": 1.0,
+          "mrr": 0.8541666666666667,
+          "ndcg@5": 0.8726593323882765,
+          "miss": 0
+        }
+      },
+      "control": [
+        {
+          "qid": "M2",
+          "query": "日志里 ConcurrentModificationException 和 PrefixLogger 一起出现是什么情况",
+          "top1": {
+            "chunk_id": "8a8bc5f2bbcb",
+            "doc": "故障排查手册",
+            "header_path": "常见故障排查手册 > 7. 向量索引与 Embedding 升级 > 7.1 换模型必须全量重建",
+            "text": "不同 embedding 模型的向量空间不可比，混用会导致检索质量断崖式下降且难以察觉。\n升级流程：\n\n1. 新建索引 `kb_v2`，全量重新向量化（评估耗时，几百页文档通常需要 20 分钟以上）。\n2. 用评测集在 v1 / v2 上各跑一遍 recall@k，确认 v2 不劣于 v1。\n3. 通过别名切换（`kb_current -> kb_v2`），保留 v1 一周便于回滚。\n4. chunk 上存 `content_hash`，用于增量更新与去重。",
+            "rank": 1,
+            "scores": {
+              "cosine": 0.4952
+            }
+          }
+        }
+      ]
+    },
+    "hybrid": {
+      "overall": {
+        "recall@1": 0.7916666666666666,
+        "recall@3": 1.0,
+        "recall@5": 1.0,
+        "mrr": 0.9166666666666666,
+        "ndcg@5": 0.9317983580242585,
+        "miss": 0
+      },
+      "by_kind": {
+        "lexical": {
+          "recall@1": 1.0,
+          "recall@3": 1.0,
+          "recall@5": 1.0,
+          "mrr": 1.0,
+          "ndcg@5": 1.0,
+          "miss": 0
+        },
+        "semantic": {
+          "recall@1": 0.625,
+          "recall@3": 1.0,
+          "recall@5": 1.0,
+          "mrr": 0.8125,
+          "ndcg@5": 0.8615986575892967,
+          "miss": 0
+        },
+        "mixed": {
+          "recall@1": 0.75,
+          "recall@3": 1.0,
+          "recall@5": 1.0,
+          "mrr": 0.9375,
+          "ndcg@5": 0.9337964164834791,
+          "miss": 0
+        }
+      },
+      "control": [
+        {
+          "qid": "M2",
+          "query": "日志里 ConcurrentModificationException 和 PrefixLogger 一起出现是什么情况",
+          "top1": {
+            "chunk_id": "195fd4ad638e",
+            "doc": "故障排查手册",
+            "header_path": "常见故障排查手册 > 1. NullPointerException 排查 > 1.1 典型成因",
+            "text": "Jackson 反序列化场景下的 NPE 有三类高频原因，按出现频率排序：\n\n1. **字段缺失后未判空**：上游返回的 JSON 中缺少某个字段，`@JsonProperty` 未标 `required`，\n   反序列化为 null 后直接参与运算。日志特征为 NPE 出现在 DTO 的 getter 调用之后。\n2. **`@JsonSubTypes` 类型解析失败**：多态反序列化时 type 字段值不在已注册子类型中，\n   Jackson 不会报错而是返回 null，调用方 NPE。特征是堆栈里出现 `TypeDeserializer`。\n3. **静态初始化顺序**：`ObjectMapper` 被声明为 static 且在静态块中被提前使用。",
+            "rank": 1,
+            "scores": {
+              "bm25": 5.565,
+              "cosine": 0.4942
+            }
+          }
+        }
+      ]
+    },
+    "hybrid+rerank": {
+      "overall": {
+        "recall@1": 0.7916666666666666,
+        "recall@3": 1.0,
+        "recall@5": 1.0,
+        "mrr": 0.9097222222222223,
+        "ndcg@5": 0.9330328858630988,
+        "miss": 0
+      },
+      "by_kind": {
+        "lexical": {
+          "recall@1": 1.0,
+          "recall@3": 1.0,
+          "recall@5": 1.0,
+          "mrr": 1.0,
+          "ndcg@5": 1.0,
+          "miss": 0
+        },
+        "semantic": {
+          "recall@1": 0.75,
+          "recall@3": 1.0,
+          "recall@5": 1.0,
+          "mrr": 0.8541666666666666,
+          "ndcg@5": 0.8913662191964322,
+          "miss": 0
+        },
+        "mixed": {
+          "recall@1": 0.625,
+          "recall@3": 1.0,
+          "recall@5": 1.0,
+          "mrr": 0.875,
+          "ndcg@5": 0.9077324383928644,
+          "miss": 0
+        }
+      },
+      "control": [
+        {
+          "qid": "M2",
+          "query": "日志里 ConcurrentModificationException 和 PrefixLogger 一起出现是什么情况",
+          "top1": {
+            "chunk_id": "195fd4ad638e",
+            "doc": "故障排查手册",
+            "header_path": "常见故障排查手册 > 1. NullPointerException 排查 > 1.1 典型成因",
+            "text": "Jackson 反序列化场景下的 NPE 有三类高频原因，按出现频率排序：\n\n1. **字段缺失后未判空**：上游返回的 JSON 中缺少某个字段，`@JsonProperty` 未标 `required`，\n   反序列化为 null 后直接参与运算。日志特征为 NPE 出现在 DTO 的 getter 调用之后。\n2. **`@JsonSubTypes` 类型解析失败**：多态反序列化时 type 字段值不在已注册子类型中，\n   Jackson 不会报错而是返回 null，调用方 NPE。特征是堆栈里出现 `TypeDeserializer`。\n3. **静态初始化顺序**：`ObjectMapper` 被声明为 static 且在静态块中被提前使用。",
+            "rank": 1,
+            "scores": {
+              "bm25": 5.565,
+              "cosine": 0.494
+            }
+          }
+        }
+      ]
+    }
+  },
+  "skipped": {}
+}

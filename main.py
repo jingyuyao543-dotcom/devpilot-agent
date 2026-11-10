@@ -39,7 +39,8 @@ def main() -> None:
     print("\n" + "=" * 60)
     print(f"步数={res.steps}  耗时={res.latency_ms}ms  "
           f"tokens={res.prompt_tokens}+{res.completion_tokens}  "
-          f"工具={res.tool_calls_total}(失败{res.tool_calls_failed})  "
+          f"工具={res.tool_calls_total}(失败{res.tool_calls_failed})"
+          f"{f' 去重{res.duplicate_calls}' if res.duplicate_calls else ''}  "
           f"降级={res.degraded}{'(' + res.degrade_reason + ')' if res.degrade_reason else ''}")
 
 

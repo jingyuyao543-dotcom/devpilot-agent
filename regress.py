@@ -77,6 +77,7 @@ class Snapshot:
     answer_head: str
     has_evidence: bool          # 答案里是否出现了 [doc= 形式的证据引用
     says_insufficient: bool     # 答案里是否出现了"证据不足"
+    duplicate_calls: int = 0    # 被去重拦截的重复调用次数（旧记录缺这个字段，给默认值）
 
 
 def _snapshot(case: dict, res) -> Snapshot:
@@ -95,6 +96,7 @@ def _snapshot(case: dict, res) -> Snapshot:
         answer_head=ans.strip().replace("\n", " ")[:80],
         has_evidence="[doc=" in ans,
         says_insufficient="证据不足" in ans,
+        duplicate_calls=getattr(res, "duplicate_calls", 0),
     )
 
 
@@ -174,7 +176,9 @@ def run_one(case: dict, retriever: Retriever, show_answer: bool = False) -> Snap
     else:
         print(f"  跑 {case['name']} ...", end="", flush=True)
         res = agent.run(case["input"])
-        print(f" 完成（{res.steps}步 / {res.prompt_tokens}tk）")
+        dup = f" / 去重{res.duplicate_calls}" if res.duplicate_calls else ""
+        deg = f" / 降级({res.degrade_reason})" if res.degraded and res.degrade_reason else ""
+        print(f" 完成（{res.steps}步 / {res.prompt_tokens}tk{dup}{deg}）")
 
     return _snapshot(case, res)
 
@@ -207,12 +211,13 @@ def main() -> int:
     run_id = time.strftime("%Y%m%d_%H%M%S")
 
     print("\n" + "=" * 78)
-    print(f"{'case':<18}{'步数':>6}{'prompt':>8}{'compl':>8}{'工具':>7}{'失败':>6}{'耗时ms':>9}{'答案字':>8}")
+    print(f"{'case':<18}{'步数':>6}{'prompt':>8}{'compl':>8}{'工具':>7}{'失败':>6}{'去重':>6}{'耗时ms':>9}{'答案字':>8}")
     print("-" * 78)
     all_warns: list[str] = []
     for s in snaps:
         print(f"{s.name:<18}{s.steps:>6}{s.prompt_tokens:>8}{s.completion_tokens:>8}"
-              f"{s.tool_calls_total:>7}{s.tool_calls_failed:>6}{s.latency_ms:>9}{s.answer_chars:>8}")
+              f"{s.tool_calls_total:>7}{s.tool_calls_failed:>6}{s.duplicate_calls:>6}"
+              f"{s.latency_ms:>9}{s.answer_chars:>8}")
         ref = baseline.get(s.name) or last.get(s.name)
         ref_name = "基线" if s.name in baseline else "上次运行"
         warns = _diff(s, ref) if ref else []

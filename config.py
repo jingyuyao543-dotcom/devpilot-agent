@@ -51,9 +51,19 @@ FETCH_RESULT_WINDOW = 2500        # 超长时返回「命中窗口」而非全�
 # ---------- 检索 ----------
 CHUNK_SIZE = 700              # 字符数（不是 token，简化计算；面试时说清楚）
 CHUNK_OVERLAP = 120
-RETRIEVE_TOP_K = 50           # 召回数量 → 交给 rerank（D6 再上 rerank，先直出 top5）
+RETRIEVE_TOP_K = 50           # 两路各召回多少，进 RRF 融合
 FINAL_TOP_K = 5
 RRF_K = 60                    # RRF 平滑常数，标准值
+
+# ---------- Rerank（cross-encoder 精排） ----------
+# 为什么不直接全用 rerank 的结果：实测它会把 4 道原本对的题排错。
+# 原因是 reranker "没把握"时不会报错，照样给一个顺序（分数整体塌到 0.01 量级）。
+# 所以加一道闸：只有 top1 分数够高才采信，否则保留 RRF 原序。这是决策，不是调参。
+RERANK_ENABLED = os.getenv("RERANK_ENABLED", "true").lower() == "true"
+RERANK_MODEL = os.getenv("RERANK_MODEL", "BAAI/bge-reranker-v2-m3")
+RERANK_CANDIDATES = 20        # 送进 reranker 的候选数（全语料才 24，取 20 已覆盖绝大多数）
+RERANK_MIN_SCORE = 0.10       # top1 低于此分视为"没把握"，退回 RRF 原序
+RERANK_TIMEOUT = 8.0          # 精排是同步阻塞在检索路径上，超时就走降级
 
 for _d in (CORPUS_DIR, INDEX_DIR, TRACE_DIR):
     _d.mkdir(parents=True, exist_ok=True)

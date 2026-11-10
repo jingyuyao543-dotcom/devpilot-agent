@@ -51,7 +51,8 @@ class Tools:
     # ---------------- 工具实现 ----------------
 
     def search_internal_doc(self, query: str, top_k: int = 5) -> str:
-        hits = self.retriever.search(query, top_k=top_k, user_groups=self.user_groups)
+        st: dict = {}
+        hits = self.retriever.search(query, top_k=top_k, user_groups=self.user_groups, stats=st)
         if not hits:
             return "检索无结果。可能是知识库中没有相关文档，请换用更具体的关键词（如异常类名、服务名）重试，或直接依据已有证据给出结论。"
         parts = []
@@ -60,6 +61,13 @@ class Tools:
                 f"[{h['rank']}] doc={h['doc']} | section={h['header_path']} | id={h['chunk_id']}\n"
                 f"{h['text']}"
             )
+        # 把精排决策附在结果尾部：模型可见（知道排序可信度），trace 也可回溯。
+        # 只在失败/拦截时提示，避免正常路径多占 token。
+        if st.get("rerank_requested") and not st.get("rerank_applied"):
+            parts.append(f"[排序说明] 精排模型对该查询置信度低（top1={st.get('rerank_top1')}），"
+                         f"已退回关键词+向量的融合排序，相关性可能不如常规。")
+        elif st.get("rerank_error"):
+            parts.append(f"[排序说明] 精排服务不可用，本次使用融合排序：{st['rerank_error']}")
         return "\n\n".join(parts)
 
     def query_git_commit(self, path: str = ".", since: str = "30 days ago", limit: int = 10) -> str:

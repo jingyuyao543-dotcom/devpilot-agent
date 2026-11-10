@@ -56,6 +56,14 @@ SYSTEM_PROMPT = """你是 DevPilot，一名资深的后端故障排查专家。
 3. 工具返回错误时，读懂错误原因再调整参数重试，不要原样重复同一调用。
 4. 证据足够后停止调用工具，直接给出结论。
 
+关于"这个问题不用查"（重要）：
+- 判断"这是咨询而不是排障"只是你的推断，不是事实。只要问题涉及本系统的
+  组件或机制（Redis / RabbitMQ / HikariCP / JVM / OOM / SSE / 限流 / 检索 /
+  会话记忆 / 配置项），必须先调用一次 SearchInternalDoc 再决定用不用它的结果。
+- 未调用任何检索工具就直接下结论、或者直接反问用户，视为排查未完成。
+- 只有检索结果为空或明显不相关时，才允许写"证据不足"；此时要说明
+  **你查了什么、返回了什么**（例如"检索 'heap dump 工具' 返回的前 5 条与问题无关"）。
+
 输出要求（严格遵守）：
 - 结构固定为四段：**现象** / **根因** / **证据** / **修复建议**
 - "证据"必须逐条列出所依据的文档 id 或提交 hash，格式如 `[doc=xxx id=abc123]`；
@@ -75,6 +83,7 @@ class RunResult:
     degrade_reason: str = ""
     tool_calls_total: int = 0
     tool_calls_failed: int = 0
+    duplicate_calls: int = 0      # 被去重拦截的重复调用次数
 
 
 def _args_hash(name: str, args: dict) -> str:
@@ -101,6 +110,7 @@ class Agent:
 
         result = RunResult(answer="", trace=[])
         recent_hashes: list[str] = []
+        seen_calls: dict[str, str] = {}   # (tool|args_hash) -> 已经回填过的结果摘要
         tail_text = ""   # 最后一步模型已经吐出的文本，超时/异常时作为部分结论
 
         for step in range(1, self.max_steps + 1):
@@ -167,7 +177,7 @@ class Agent:
                 continue
 
             # ---- 工具执行（并发 + 单工具超时 + 失败回填） ----
-            tool_msgs = self._execute_tools(resp.tool_calls)
+            tool_msgs = self._execute_tools(resp.tool_calls, seen_calls, result)
             self._append_tool_msgs(messages, resp, [m[1] for m in tool_msgs], result, step, resp,
                                    meta=[m[2] for m in tool_msgs])
 
@@ -180,16 +190,39 @@ class Agent:
             result.answer = tail_text or "已达到最大推理步数，未能收敛。以下是基于现有证据的初步判断，建议人工复核。"
 
         result.latency_ms = int((time.perf_counter() - started) * 1000)
+        _check_grounding(result)
         _dump_trace(trace_id, user_input, result)
         return result
 
     # ---------------- 工具执行 ----------------
-    def _execute_tools(self, tool_calls) -> list[tuple]:
+    def _execute_tools(self, tool_calls, seen_calls: dict[str, str] | None = None,
+                       result: RunResult | None = None) -> list[tuple]:
+        """执行工具。同一 (工具名, 参数) 只真正执行一次，第二次起直接回填提示。
+
+        为什么要这个硬约束：实测发现模型会「换个措辞再问一遍」同一件事
+        （比如 SearchInternalDoc 连调 3 次，query 只差一两个字），
+        每次都要付一整轮的 prompt token，但没有任何新信息。
+        纯靠 prompt 说「不要重复调用」没有用 —— 模型会把它理解成建议而不是规则。
+        """
+        seen = seen_calls if seen_calls is not None else {}
+
         def one(tc) -> tuple:
             t0 = time.perf_counter()
             if tc.parsed is None:
                 return (tc.id, f"错误：你输出的 arguments 不是合法 JSON（原文：{tc.arguments[:200]}）。"
                                f"请重新以严格 JSON 格式调用该工具。", {"error": "bad_json"})
+
+            # ---- 去重：完全相同的调用只执行一次 ----
+            key = f"{tc.name}|{_args_hash(tc.name, tc.parsed)}"
+            if key in seen:
+                if result is not None:
+                    result.duplicate_calls += 1
+                return (tc.id,
+                        f"[跳过] 你用完全相同的参数已经调用过 {tc.name}，上面已有结果，这里不再重复执行。"
+                        f"要拿新信息请换参数（比如换关键词）或换工具；若已够用，请直接给出结论。",
+                        {"duplicate": True, "tool": tc.name, "args": tc.parsed,
+                         "latency_ms": 0})
+
             content = self.tools.call(tc.name, tc.parsed)
             handle = None
             # FetchToolResult 的语义就是「取原文」，绝不能对它再跑一次压缩链 ——
@@ -210,6 +243,8 @@ class Agent:
                 meta = {"error": content[:200]}
             meta.update({"tool": tc.name, "args": tc.parsed,
                          "latency_ms": int((time.perf_counter() - t0) * 1000)})
+            # 只有真正执行过（不管成功还是报错）的调用才登记，避免把「跳过」也当成一次调用
+            seen[key] = f"{tc.name} 已调用，结果已在上文"
             return (tc.id, content, meta)
 
         out: list[tuple] = []
@@ -238,7 +273,9 @@ class Agent:
                 result.tool_calls_failed += 1
         # 失败/压缩过程打到 stderr，方便演示时讲"自我纠错"和"上下文压缩"
         for tc, m in zip(resp.tool_calls, meta):
-            if m.get("error"):
+            if m.get("duplicate"):
+                print(f"  [step {step}] ⊘ {tc.name} 重复调用已跳过", file=sys.stderr, flush=True)
+            elif m.get("error"):
                 print(f"  [step {step}] ✗ {tc.name} 失败: {m['error']}", file=sys.stderr, flush=True)
             elif m.get("compaction") and m["compaction"] != "none":
                 print(f"  [step {step}] ↓ {tc.name} 压缩 {m['orig_chars']}→{m['new_chars']} 字 "
@@ -298,6 +335,43 @@ class Agent:
             total -= len(old) - len(expired)
 
 
+def _check_grounding(result: RunResult) -> None:
+    """答案里没有任何证据引用时，标记为 degraded（可溯源校验）。
+
+    为什么不拦截答案：有些问题（闲聊、澄清）本来就不需要证据，硬拦截会误伤。
+    打标记是更工程化的做法 —— 上层拿到 degraded=True 就知道"这段结论没有出处"，
+    可以决定是提示用户「建议人工复核」还是走人工审批。
+
+    实测触发场景：doc_only 有一次只用了 1191 个 prompt token、0 次工具调用就直接作答，
+    答案本身读起来通顺，但完全来自模型参数记忆，属于潜在的幻觉。
+    回归脚本里「证据引用消失」这条硬判断就是为了抓这种情况。
+
+    豁免规则：显式声明「证据不足 / 信息缺失」的答案不算幻觉，不该打标。
+    否则"日志文件不存在"这种合理结论会被误判成降级。
+
+    ⚠️ 但豁免本身留了一个洞（实测发现）：
+    模型可以在**一次工具都不调**的情况下直接写"证据不足"，然后凭参数记忆作答。
+    这句话完全合法地绕过了上面所有判断，而 25 条评测里这种"0 工具调用"出现了 9 次，
+    其中 8 条语料里明明有答案、检索 top1 就是正确段落。
+    所以先判 no_tool_call，再判 no_citation —— 逃避路径必须单独关掉。
+    """
+    if result.degraded:
+        return
+    # 0 次工具调用 = 根本没有取证，无论答案写了什么都是未完成排查
+    if result.tool_calls_total == 0:
+        result.degraded = True
+        result.degrade_reason = "no_tool_call"
+        return
+    ans = result.answer
+    if "[doc=" in ans or "commit=" in ans.lower():
+        return
+    # 查过了、检索结果确实没有证据，并主动承认 = 诚实，不是幻觉
+    if "证据不足" in ans or "信息缺失" in ans or "无法确定" in ans:
+        return
+    result.degraded = True
+    result.degrade_reason = "no_citation"
+
+
 def _dump_trace(trace_id: str, user_input: str, result: RunResult) -> None:
     d = config.TRACE_DIR / trace_id
     d.mkdir(parents=True, exist_ok=True)
@@ -313,5 +387,6 @@ def _dump_trace(trace_id: str, user_input: str, result: RunResult) -> None:
         "completion_tokens": result.completion_tokens,
         "tool_calls_total": result.tool_calls_total,
         "tool_calls_failed": result.tool_calls_failed,
+        "duplicate_calls": result.duplicate_calls,
         "spans": result.trace,
     }, ensure_ascii=False, indent=2), encoding="utf-8")

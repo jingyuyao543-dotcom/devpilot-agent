@@ -46,7 +46,10 @@ def compact_tool_result(text: str, query: str, max_chars: int = config.TOOL_RESU
     has_stack = False
     continuation_left = 0          # 异常行之后允许跟随的描述行数
     for ln in lines:
-        if EXC_LINE.search(ln):
+        # 注意：栈帧行也含 "at xxx(...)"，会被 EXC_LINE 命中。
+        # 如果直接走异常分支，frame_count 会被每条栈帧重置为 0，
+        # 「前 20 帧」的上限就形同虚设（单测 test_frames_capped_at_20 抓到的真 bug）。
+        if EXC_LINE.search(ln) and not FRAME_LINE.search(ln):
             keep.append(ln)
             frame_count = 0
             has_stack = True

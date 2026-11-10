@@ -1,5 +1,5 @@
 {
   "chunks": 24,
-  "embedding_enabled": false,
-  "embedding_model": null
+  "embedding_enabled": true,
+  "embedding_model": "BAAI/bge-m3"
 }
