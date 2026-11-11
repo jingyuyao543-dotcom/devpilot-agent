@@ -1,10 +1,10 @@
 """工具集。
 
-设计要点（面试可讲）：
+约定：
 - 统一 Tool 描述符：name / description / schema / permission_level / timeout / idempotent
-- description 本身就是 prompt 工程：参数约束和示例写进去，能显著降低参数格式错误率
-- 所有工具只读，没有副作用工具 —— 有副作用的操作默认不进工具集（护栏）
-- 工具异常不外抛，统一转成文本回填给模型做自我纠正
+- description 本身参与 prompt：参数约束和示例写进去，能降低参数格式错误率
+- 所有工具只读，没有副作用工具 —— 有副作用的操作默认不进工具集
+- 工具异常不外抛，统一转成文本回填给模型
 """
 from __future__ import annotations
 

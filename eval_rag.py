@@ -1,4 +1,4 @@
-"""D5 检索评测：recall@k / MRR / nDCG@k，三组对比（bm25 / vector / hybrid）。
+"""检索评测：recall@k / MRR / nDCG@k，四组对比（bm25 / vector / hybrid / hybrid+rerank）。
 
 用法：
     python eval_rag.py                 # 跑三组（无 embedding key 时 vector/hybrid 自动标注 SKIP）
@@ -7,8 +7,8 @@
     python eval_rag.py --dump          # 打印每条 query 的 top5 明细（调错用）
 
 为什么自己写指标而不是用 ragas/trulens：
-    24 个 chunk、24 条 query，指标就四行公式。引入框架只会多一层黑盒，
-    面试官问"nDCG 你怎么算的"时答不上来。自己写还能顺手做"gold 唯一匹配"的硬校验。
+    指标就四行公式，引入框架只会多一层黑盒，出了问题不好定位。
+    自己写还能顺手做"gold 唯一匹配"的硬校验。
 
 三个指标为什么都要看：
     recall@5   —— 召回管道上限：gold 没进 top5，后面 rerank 再强也救不回来。

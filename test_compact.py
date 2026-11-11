@@ -1,11 +1,11 @@
 """上下文压缩的单测：不调模型、不花钱、0.1 秒跑完。
 
-为什么必须有这个文件（面试可讲）：
+为什么要有这个文件：
   压缩逻辑是「代码保证」还是「模型这次恰好看懂了」，两回事。
-  本项目真实踩过坑：C1 那次正则把 `Caused by:` 之后的描述行当噪声丢了，
-  模型因此误判"证据不足"。如果当时有这条单测，回归时会立刻红。
+  踩过一次坑：正则把 `Caused by:` 之后的描述行当噪声丢了，
+  模型因此误判"证据不足"。有这条单测的话，回归时会立刻红。
 
-  另一个价值：它把"压缩不能丢什么"这件事写成了可执行的规格，
+  另一个价值：它把"压缩不能丢什么"写成了可执行的规格，
   以后改正则，跑一下就知道有没有把关键行丢掉。
 
 运行：python -m pytest test_compact.py -v
@@ -48,7 +48,7 @@ MUST_KEEP = [
     "NullPointerException",
     "Caused by",
     "InvalidFormatException",
-    "Cannot deserialize value of type",       # ← C1 事故里被丢掉的续行
+    "Cannot deserialize value of type",       # ← 曾经被当成噪声丢掉的续行
     "java.util.ArrayList<java.lang.String>",  # ← 续行里的关键类型
     "line: 1, column: 62",                    # ← 续行里的定位信息
     "ProductClient.parseDetail",              # ← 真正的出错点
@@ -70,7 +70,7 @@ def test_short_text_not_compacted():
 
 
 def test_structure_keeps_exception_and_continuation():
-    """核心用例：异常行 + 续行 + 栈帧必须保留（C1 事故的回归）。"""
+    """核心用例：异常行 + 续行 + 栈帧必须保留（续行丢失的回归）。"""
     r = compact_tool_result(JAVA_STACK, query="UserService 空指针", max_chars=6000)
     assert r["method"] == "structure", f"应走结构抽取，实际走的是 {r['method']}"
     content = r["content"]
@@ -149,6 +149,10 @@ def test_idempotent_on_compact_input():
 
 
 # ---------------- 简易 runner（不依赖 pytest） ----------------
+
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
 
 def _run_all() -> int:
     tests = [(n, f) for n, f in globals().items() if n.startswith("test_") and callable(f)]

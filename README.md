@@ -257,5 +257,5 @@ python regress.py                 # 3 个固定 case 的回归快照
 完整的失败记录与修复思路见 [`docs/development-log.md`](docs/development-log.md)，
 所有实测数字的汇总（含失败与回滚记录）见 [`numbers.md`](numbers.md)。
 
-> 如果面试时需要核实某个数字，仓库里的 JSON 都是对应脚本的真实输出，
+> 所有数字都能在仓库里核实：对应的 JSON 是脚本的真实输出，
 > 可以直接 `python eval_rag.py` / `python ablate_steps.py --repeat 3` 复现。

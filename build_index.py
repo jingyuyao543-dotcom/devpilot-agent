@@ -8,7 +8,7 @@ from rag import Retriever
 def main() -> None:
     r = Retriever()
     r.build(config.CORPUS_DIR)
-    # 建完立刻做 8 条查询的自检（D2 当天就要有 recall 手感，别等到 D5）
+    # 建完立刻跑一遍自检查询，确认语料和分词没有坏掉
     probes = [
         "NullPointerException Jackson 反序列化",
         "连接池耗尽 HikariCP timeout",

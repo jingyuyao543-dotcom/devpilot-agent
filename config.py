@@ -1,6 +1,6 @@
 """全局配置。
 
-设计要点：所有可调参数集中在这里，面试时"你参数怎么定的"能一句话指到文件。
+所有可调参数集中在这里，调优时只改这一个文件。
 """
 import os
 from pathlib import Path
@@ -26,7 +26,7 @@ EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "BAAI/bge-m3")
 RAG_BM25_ONLY = os.getenv("RAG_BM25_ONLY", "false").lower() == "true"
 
 # ---------- Agent 循环 ----------
-MAX_STEPS = 8                 # 5/8/12 三档要自己测，默认 8
+MAX_STEPS = 8                 # 依据见 ablate_steps.py 的消融结果
 MAX_PARALLEL_TOOLS = 3        # 同一轮多个 tool_call 的并发上限
 PER_TOOL_TIMEOUT = 15.0       # 单个工具超时（秒）
 TASK_TIMEOUT = 90.0           # 整个任务超时（秒），触发后返回部分结论
@@ -35,7 +35,7 @@ LOOP_WINDOW = 3               # 滑窗内相同 tool call 出现次数达到该�
 LLM_RETRY = 2                 # 模型调用失败的重试次数（指数退避）
 
 # ---------- 上下文预算 ----------
-# 单位说明（面试会问，别答错）：
+# 单位说明：
 #   代码里按「字符数」计算，因为中英混排没有免费的 tokenizer；
 #   换算是经验值：中文 1 字 ≈ 1 token，英文 4 字符 ≈ 1 token，代码/日志约 3 字符 ≈ 1 token。
 #   DeepSeek-chat 上下文 64K token，按最保守的中文 1:1 估算，工具结果给 12000 字 ≈ 12K token，安全。
@@ -49,7 +49,7 @@ FETCH_RESULT_MAX_CHARS = 20000    # 模型主动要原文时放宽上限（本�
 FETCH_RESULT_WINDOW = 2500        # 超长时返回「命中窗口」而非全文，避免把压缩白做
 
 # ---------- 检索 ----------
-CHUNK_SIZE = 700              # 字符数（不是 token，简化计算；面试时说清楚）
+CHUNK_SIZE = 700              # 字符数，不是 token（避免额外依赖分词器，估算保守即可）
 CHUNK_OVERLAP = 120
 RETRIEVE_TOP_K = 50           # 两路各召回多少，进 RRF 融合
 FINAL_TOP_K = 5

@@ -1,6 +1,6 @@
 """LLM 客户端封装。
 
-面试考点（这两个坑是"跑过"和"看过"的分界线，代码里都有注释）：
+两个容易踩的点，代码里都有对应处理：
 
 1. 流式下 function.arguments 是增量分片，中途不是合法 JSON，不能边收边 json.loads。
 2. 一轮返回多个 tool_call 时，回填给模型的 ToolMessage 顺序必须和 tool_calls 一一对应

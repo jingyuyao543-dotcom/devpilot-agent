@@ -1,12 +1,12 @@
 """检索层：切块 + BM25 + 向量 + RRF 融合 + rerank 精排。
 
-面试要点：
-- 切块按结构（标题层级）而不是定长 512 token，块前缀拼 header_path。
-- 混合检索用 RRF 融合排名，不给两路分数加权求和（分数不可比）。
-- metadata ACL 过滤在检索层做，不靠 prompt 约束模型。
-- 没有 embedding key 时自动降级为纯 BM25，保证代码随时能跑。
+几个实现上的取舍：
+- 切块按标题层级而不是定长 512 token，块前缀拼 header_path。
+- 混合检索用 RRF 融合排名，不对两路分数加权求和（量纲不可比）。
+- metadata ACL 过滤在检索层做，不依赖 prompt 约束模型。
+- 没有 embedding key 时降级为纯 BM25，保证代码在没有向量服务时也能跑。
 - rerank 带阈值闸门：reranker 没把握时分数整体塌到 0.01 量级却照样给顺序，
-  直接采信会把它"噪声排序"覆盖掉本来对的 RRF 结果（D5 实测坏了 4 条）。
+  直接采信会用噪声排序覆盖本来正确的 RRF 结果（评测里坏了 4 条）。
 """
 from __future__ import annotations
 
@@ -193,7 +193,7 @@ class Retriever:
         query: str,
         top_k: int = config.FINAL_TOP_K,
         user_groups: list[str] | None = None,
-        mode: str = "hybrid",          # hybrid | bm25 | vector，用于 D5 的对比实验
+        mode: str = "hybrid",          # hybrid | bm25 | vector，用于对比实验
         rerank: bool | None = None,    # None = 跟随 config.RERANK_ENABLED
         stats: dict | None = None,     # 传入则回填 rerank 决策与耗时，供评测/调试读取
     ) -> list[dict]:
@@ -357,10 +357,10 @@ _jieba = None
 def tokenize(text: str) -> list[str]:
     """中文分词，英文/标识符按词切，统一小写。
 
-    三档降级，D5 评测校准过顺序（别凭直觉改）：jieba > 二元组 > 整句。
+    三档降级，顺序经过评测校准（别凭直觉改）：jieba > 二元组 > 整句。
     「整句」那一档是最坏的：正则 `[\\u4e00-\\u9fa5]{2,}` 会把一句中文切成一整个 token，
-    BM25 全库零命中，所有分都是 0，排序退化成「按文档 id」——看起来没报错，实际已经瞎了。
-    这不是假想敌：D5 第一次跑时 jieba 没装，semantic 档 recall@5 只有 0.125，根因就是它。
+    BM25 全库零命中，所有分都是 0，排序退化成「按文档 id」——不报错，但已经失效了。
+    这是实测过的失败路径：未安装 jieba 时语义档 recall@5 只有 0.125，根因就是它。
     """
     global _jieba
     if _jieba is None:
@@ -399,7 +399,7 @@ def tokenize(text: str) -> list[str]:
 def _split_identifier(tok: str) -> list[str]:
     """把 `leak_detection_threshold` / `leakDetectionThreshold` / `a.b.c` 拆成原子词。
 
-    D5 评测里 M5 是唯一一条 BM25 漏召回的题，根因就是这个：
+    评测里 M5 是唯一一条 BM25 漏召回的题，根因就是这个：
     语料写 `leakDetectionThreshold`，用户查 `LEAK_DETECTION_THRESHOLD`，
     lower 之后是两个不同的 token，查询最重的那一票直接投空，全库 0 分。
     同一个配置项在代码、配置、日志、提问里会有四种拼法，分词层不统一就必挂。
