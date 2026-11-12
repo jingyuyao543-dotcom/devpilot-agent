@@ -4,7 +4,7 @@
 输出「现象 — 根因 — 证据 — 修复建议」四段式结论，每条结论附可溯源的文档 chunk 引用。
 
 > 这个项目的重点不是「跑起来一个 Agent」，而是**把 Agent 的效果量化出来，并找到它说谎的方式**。
-> 下文所有数字都可在本仓库复现，见 [`numbers.md`](numbers.md)。
+> 下文所有数字都可在本仓库复现，对应的原始 JSON 都在 `.index/` 和仓库根目录。
 
 ---
 
@@ -229,7 +229,7 @@ python regress.py                 # 3 个固定 case 的回归快照
 | `eval_grounding_judge.py` | LLM-as-judge 引用错配 |
 | `ablate_steps.py` | MAX_STEPS 消融 |
 | `test_compact.py` / `regress.py` | 压缩单测 / 端到端回归快照 |
-| `numbers.md` | **所有实测数字的汇总，含失败与回滚记录** |
+| `*.json` | 各评测脚本的原始输出（`eval_rag_result` / `hallucination` / `grounding_judge` / `ablation_steps`） |
 
 ---
 
@@ -254,8 +254,7 @@ python regress.py                 # 3 个固定 case 的回归快照
 - 全部故障的定位与修复：压缩丢行、预算淘汰、提示词回滚、分词静默降级、幻觉逃逸路径
 - 每一个数字对应的实验设计与运行（60 次步数消融、3 组对照回归）
 
-完整的失败记录与修复思路见 [`docs/development-log.md`](docs/development-log.md)，
-所有实测数字的汇总（含失败与回滚记录）见 [`numbers.md`](numbers.md)。
+完整的失败记录与修复思路见 [`docs/development-log.md`](docs/development-log.md)。
 
 > 所有数字都能在仓库里核实：对应的 JSON 是脚本的真实输出，
 > 可以直接 `python eval_rag.py` / `python ablate_steps.py --repeat 3` 复现。
